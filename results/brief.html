@@ -1,0 +1,357 @@
+<title>RosterWatch Kickoff Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~880px) like a scouting report; flags as small-multiple cards, method + evidence as tables. */
+:root {
+  --bg: #F3F6F8; --surface: #FFFFFF; --ink: #15212C; --muted: #5B6875; --line: #D9E0E6;
+  --accent: #1D5BA6; --rise: #12775A; --fragile: #A86300; --injury: #B3261E;
+  --rise-soft: #E3F3EC; --fragile-soft: #FBF0DF; --injury-soft: #FBE7E5; --accent-soft: #E4EDF8;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E141A; --surface: #161F28; --ink: #E5ECF2; --muted: #93A1AE; --line: #29353F;
+  --accent: #79AEEF; --rise: #4DC79B; --fragile: #E6A845; --injury: #F2837A;
+  --rise-soft: #12302A; --fragile-soft: #33260F; --injury-soft: #3A1B19; --accent-soft: #172B42; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E141A; --surface: #161F28; --ink: #E5ECF2; --muted: #93A1AE; --line: #29353F;
+  --accent: #79AEEF; --rise: #4DC79B; --fragile: #E6A845; --injury: #F2837A;
+  --rise-soft: #12302A; --fragile-soft: #33260F; --injury-soft: #3A1B19; --accent-soft: #172B42; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); }
+.wrap { max-width: 880px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; display: grid; gap: 52px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-size: clamp(44px, 8vw, 68px); font-weight: 700; letter-spacing: -0.5px; }
+h2 { font-size: 30px; font-weight: 600; }
+h3 { font-size: 21px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font: 600 13px/1 var(--display); letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+section { display: grid; gap: 18px; }
+.lede { font-size: 17px; color: var(--muted); }
+header { display: grid; gap: 14px; }
+
+.scoreboard { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.scoreboard div { flex: 1 1 140px; padding: 14px 18px; border-right: 1px solid var(--line); display: grid; gap: 2px; }
+.scoreboard div:last-child { border-right: 0; }
+.scoreboard b { font: 700 34px/1 var(--display); font-variant-numeric: tabular-nums; }
+.scoreboard span { font-size: 13px; color: var(--muted); }
+.k-rise b { color: var(--rise); } .k-fragile b { color: var(--fragile); } .k-injury b { color: var(--injury); }
+
+.group { display: grid; gap: 12px; }
+.group-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.group-head p { font-size: 14px; color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card .name { font: 600 20px/1.1 var(--display); }
+.chip { font: 500 12px/1 var(--mono); padding: 4px 6px; border-radius: 4px; background: var(--soft); color: var(--c); white-space: nowrap; }
+.meta { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+.meta b { color: var(--ink); font-weight: 600; font-family: var(--mono); }
+.reason { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.ctx { font-size: 12px; font-family: var(--mono); color: var(--c); }
+svg.spark { width: 100%; height: auto; display: block; }
+svg.spark text { font: 10px var(--mono); fill: var(--muted); }
+.rise { --c: var(--rise); --soft: var(--rise-soft); }
+.fragile { --c: var(--fragile); --soft: var(--fragile-soft); }
+.injury { --c: var(--injury); --soft: var(--injury-soft); }
+.legend { font-size: 12.5px; color: var(--muted); display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--ink); vertical-align: middle; margin-right: 6px; }
+.legend i.dash { border-top: 2px dashed var(--muted); }
+.legend i.band { height: 10px; border: 0; background: var(--line); }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 12px; counter-reset: s; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.step .n { font: 700 13px/1 var(--display); letter-spacing: 1.4px; color: var(--accent); text-transform: uppercase; }
+.step p { font-size: 14px; }
+.formula { font: 13px/1.5 var(--mono); background: var(--accent-soft); color: var(--ink); padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; }
+th { font: 600 12px/1.2 var(--display); letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 14px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-variant-numeric: tabular-nums; vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+tr.pick td { background: var(--accent-soft); }
+tr.ref td { color: var(--muted); }
+.bar { display: flex; align-items: center; gap: 8px; }
+.bar s { display: block; height: 8px; border-radius: 2px; background: var(--accent); text-decoration: none; }
+.bar.alt s { background: var(--muted); }
+.note { font-size: 13.5px; color: var(--muted); }
+
+.findings { display: grid; gap: 14px; }
+.finding { display: grid; grid-template-columns: 92px 1fr; gap: 16px; align-items: start; padding-block: 14px; border-top: 1px solid var(--line); }
+.finding .big { font: 700 38px/1 var(--display); color: var(--accent); font-variant-numeric: tabular-nums; }
+.finding p { font-size: 14.5px; }
+.finding strong { display: block; font-weight: 600; margin-bottom: 2px; }
+
+.ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: 12px; }
+.idea { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.idea h3 { font-size: 19px; }
+.idea p { font-size: 13.5px; color: var(--muted); }
+.tag { justify-self: start; font: 500 11px/1 var(--mono); padding: 4px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+
+.lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 12px; }
+.lane { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; display: grid; gap: 6px; align-content: start; }
+.lane p { font-size: 13.5px; color: var(--muted); }
+ol.qs { margin: 0; padding-left: 22px; display: grid; gap: 8px; max-width: 70ch; }
+ol.qs li { padding-left: 4px; }
+footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 6px; }
+@media (max-width: 520px) { .finding { grid-template-columns: 1fr; gap: 6px; } .scoreboard div { flex-basis: 45%; border-bottom: 1px solid var(--line); } }
+.phase { font: 600 12px/1 var(--display); letter-spacing: 1.4px; text-transform: uppercase; padding: 5px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); justify-self: start; }
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 14px; }
+.case { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.case p { font-size: 13.5px; color: var(--muted); }
+svg.cchart { width: 100%; height: auto; display: block; }
+svg.cchart text { font: 10.5px var(--mono); fill: var(--muted); }
+svg.cchart text.flag { font: 600 11px var(--display); letter-spacing: 0.4px; }
+.key { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--k); vertical-align: middle; margin-right: 6px; }
+.stack td:first-child { font-family: var(--body); font-weight: 600; }
+.stack td { font-family: var(--body); font-size: 13.5px; }
+.status { font: 500 11.5px/1 var(--mono); padding: 4px 6px; border-radius: 4px; white-space: nowrap; }
+.s-done { background: var(--rise-soft); color: var(--rise); }
+.s-part { background: var(--fragile-soft); color: var(--fragile); }
+.s-next { background: var(--accent-soft); color: var(--accent); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 14px; }
+.two > div { display: grid; gap: 10px; min-width: 0; align-content: start; }
+.two table { min-width: 0; }
+.two td, .two th { padding-inline: 10px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">UCSD DS3 · RosterWatch kickoff · Working prototype</div>
+    <h1>RosterWatch</h1>
+    <p class="lede">A first pass at both phases of the plan, built on free nflverse and Sleeper data. Phase 1 catches sudden usage shifts. A Phase 2 prototype catches the slow bleed. Each detector's threshold was tested on four past seasons. All of it is a starting point for us to argue about.</p>
+    <div class="scoreboard" id="scoreboard"></div>
+  </header>
+
+  <section>
+    <span class="phase">Phase 2 preview · the slow bleed</span>
+    <h2>Would RosterWatch have caught it in 2025?</h2>
+    <p>Two 2025 backfields match the problem in our overview: a veteran slowly giving up work to a younger back. The lines show weekly snap share. The markers show the first week each player's slow-bleed or slow-climb tally crossed the flag line.</p>
+    <div class="cases" id="cases"></div>
+    <p class="note">Houston had an earlier sign too. In Week 4, Marks already had 44% of the team's passing-down targets and carries (3rd/4th down and the last two minutes of a half), while Chubb still played 42% of snaps. Passing-down work moved before overall snaps did.</p>
+  </section>
+
+  <section>
+    <h2>Two detectors</h2>
+    <p>Each flag traces back to a few averages and a noise estimate measured on 2022–25. There is no black box.</p>
+    <div class="steps">
+      <div class="step"><span class="n">Phase 1 · Shift score</span><h3>Sudden changes</h3><p>Average of the last 2 games minus the average of earlier games this season, divided by how much usage normally moves for that position. +2 means the change was twice normal noise.</p><div class="formula">(mean last 2 − mean earlier) / σ<sub>pos</sub></div></div>
+      <div class="step"><span class="n">Phase 2 · CUSUM tally</span><h3>Slow bleeds and climbs</h3><p>Sets a player's established level from his first 3 games, then keeps a running total of how far each game lands from it. Small misses add up. One outlier game counts for at most 3 SD.</p><div class="formula">tally = min(0, tally + z<sub>game</sub> + 0.5)</div></div>
+      <div class="step"><span class="n">Inputs</span><h3>What counts as usage</h3><p>Snap share, opportunity share (share of team targets + carries) and passing-down share. All three are volume measures, so one long touchdown can't create a flag.</p><div class="formula">opp = (tgt + car) / team(tgt + car)</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Defending the thresholds</h2>
+    <p>Both detectors ran on every RB/WR/TE game from 2022–2025, and we checked the next 3 games. A higher bar means fewer flags, and more of them hold up. The prototype's settings are highlighted.</p>
+    <div class="two">
+      <div><h3>Shift score (rises)</h3><div class="tablewrap"><table id="bt"></table></div><p class="note">"Stayed up": next-3-game usage still above the old baseline.</p></div>
+      <div><h3>CUSUM tally</h3><div class="tablewrap"><table id="cbt"></table></div><p class="note">Hit: next-3-game snap share at least 5 points past the established level, in the flagged direction. The reference row shows how often that happens with no signal.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="phase">Phase 1 · live</span>
+    <h2>This week's flags</h2>
+    <div class="eyebrow">2026 season · through Week 4</div>
+    <div class="legend"><span><i></i>snap share by week</span><span><i class="dash"></i>earlier-games average</span><span><i class="band"></i>last 2 games</span></div>
+    <div id="groups" class="group" style="gap:34px"></div>
+    <p class="note">No Slow Bleed or Slow Climb flags yet. CUSUM needs 3 games to set a player's established level, so at Week 4 it has one game of evidence. The shift score covers the early season, and CUSUM takes over from about Week 6.</p>
+  </section>
+
+  <section>
+    <h2>What surprised me</h2>
+    <div class="findings" id="findings"></div>
+  </section>
+
+  <section>
+    <h2>Our tool stack, today</h2>
+    <div class="tablewrap"><table class="stack">
+      <thead><tr><th>Tool</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>nflverse</td><td><span class="status s-done">working</span></td><td>Snap counts, weekly stats and play-by-play via the Python package <span class="mono">nflreadpy</span>, 2022–2026. Per-play on-field data stops at 2025.</td></tr>
+        <tr><td>Sleeper API</td><td><span class="status s-part">partial</span></td><td>Depth chart, injury status and 7-day trending adds/drops (top 100) are in. Sleeper has no "% rostered", so the prototype borrows ESPN's for now.</td></tr>
+        <tr><td>BigQuery</td><td><span class="status s-next">next</span></td><td>Each output is a single tidy table, ready to load as-is.</td></tr>
+        <tr><td>Looker Studio</td><td><span class="status s-next">next</span></td><td>CSVs ready for three views: flags, player trends, and a methodology page.</td></tr>
+        <tr><td>Gemini (Vertex AI)</td><td><span class="status s-part">template</span></td><td>Each flag already has a reason built only from our numbers. Gemini would only reword those sentences.</td></tr>
+        <tr><td>GitHub</td><td><span class="status s-next">next</span></td><td>About 500 lines of Python, ready to push. A weekly GitHub Action could run the pipeline.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Ideas to take further</h2>
+    <div class="ideas">
+      <div class="idea"><span class="tag">phase 2</span><h3>Volume vs. one big play</h3><p>Score how much of a player's fantasy output came from a single play, and show it next to each flag. A 60-yard touchdown on 3 touches should never look like a role.</p></div>
+      <div class="idea"><span class="tag">phase 2</span><h3>Earned vs. inherited roles</h3><p>Use Sleeper and nflverse injury data to label each rise as earned or as covering for an injured starter. Then backtest what happens when the starter returns.</p></div>
+      <div class="idea"><span class="tag">phase 2</span><h3>Does passing-down share lead?</h3><p>Test the Houston pattern across all backfields. Does a drop in passing-down share predict a later drop in total snaps, and by how many weeks?</p></div>
+      <div class="idea"><span class="tag">statistics</span><h3>Better established levels</h3><p>Use last season's role as a prior for a player's established level, shrunk toward his early 2026 games. Then CUSUM works from Week 1.</p></div>
+      <div class="idea"><span class="tag">data</span><h3>Routes and personnel</h3><p>For 2016–2025, per-play on-field data gives routes run and 3rd-down snaps directly. That's useful for validating the play-by-play estimate.</p></div>
+      <div class="idea"><span class="tag">product</span><h3>Market lag</h3><p>Snapshot Sleeper adds and drops every week and measure how many weeks the market trails our flags. That gap is the tool's value.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>A possible split for four</h2>
+    <div class="lanes">
+      <div class="lane"><h3>Pipeline &amp; BigQuery</h3><p>Weekly loads, Sleeper snapshots, scheduled job on GitHub Actions.</p></div>
+      <div class="lane"><h3>Phase 1 model</h3><p>Shift score, noise model, threshold choice. Owns the backtest scorecard.</p></div>
+      <div class="lane"><h3>Phase 2 model</h3><p>CUSUM, passing-down lead, earned vs. inherited, big-play filter.</p></div>
+      <div class="lane"><h3>Dashboard &amp; story</h3><p>Looker Studio views, grounded Gemini explanations, case studies, write-up.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Questions for our mentor</h2>
+    <ol class="qs">
+      <li>Sleeper doesn't publish "% rostered." Do we define "low-rostered" with Sleeper trending adds, keep ESPN's number, or both?</li>
+      <li>Should the 2025 case studies count as Phase 2 evidence, or do we need live 2026 cases?</li>
+      <li>CUSUM is quiet until about Week 6. Is it worth using last season as a prior so it starts sooner?</li>
+      <li>Which weeks are milestones for the Phase 1 deliverable and the public dashboard?</li>
+      <li>Do Gemini explanations ship in Phase 1, or wait until the core model works?</li>
+    </ol>
+  </section>
+
+  <footer>
+    <span>Data: nflverse via <span class="mono">nflreadpy</span> (PFR snap counts, player stats, play-by-play), Sleeper API, ESPN fantasy % rostered (snapshot 2026-10-12). Regular season only.</span>
+    <span>Code: <span class="mono">src/</span> (Python + pandas). Run from the repo root with <span class="mono">python -m src.pipeline</span>.</span>
+  </footer>
+</div>
+
+<script>
+const D = {"flags": [{"signal": "Waiver Riser", "player": "Tyler Higbee", "position": "TE", "team": "LA", "as_of_week": 4, "pct_rostered": 3.12, "pct_rostered_change": 0.03, "shift_score": 4.163, "snap_pct_base": 0.23, "snap_pct_recent": 0.68, "opp_share_base": 0.018, "opp_share_recent": 0.116, "depth_chart_order": 1.0, "injury_status": null, "sleeper_adds_7d": 1870362.0, "sleeper_drops_7d": 330795.0, "context": "fill-in?", "reason": "Last 2 games vs earlier: snap share 23% -> 68%, opportunity share 2% -> 12% (shift +4.2 SD). Context: same-position teammate(s) Colby Parkinson (missed wk 4) lost usage or missed time, so this may be fill-in work. Check their status.", "weeks": [1, 2, 3, 4], "snap": [0.2, 0.26, 0.71, 0.65], "opp": [0.036, 0.0, 0.153, 0.08]}, {"signal": "Waiver Riser", "player": "Brycen Tremayne", "position": "WR", "team": "CAR", "as_of_week": 4, "pct_rostered": 0.65, "pct_rostered_change": -0.01, "shift_score": 3.4, "snap_pct_base": 0.175, "snap_pct_recent": 0.865, "opp_share_base": 0.0, "opp_share_recent": 0.069, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": "fill-in?", "reason": "Last 2 games vs earlier: snap share 18% -> 86%, opportunity share 0% -> 7% (shift +3.4 SD). Context: same-position teammate(s) Jalen Coker (missed wk 4), Xavier Legette (missed wk 4) lost usage or missed time, so this may be fill-in work. Check their status.", "weeks": [1, 2, 3, 4], "snap": [0.18, 0.17, 0.81, 0.92], "opp": [0.0, 0.0, 0.092, 0.045]}, {"signal": "Waiver Riser", "player": "Dohnte Meyers", "position": "WR", "team": "CIN", "as_of_week": 4, "pct_rostered": 11.39, "pct_rostered_change": -0.02, "shift_score": 3.225, "snap_pct_base": 0.17, "snap_pct_recent": 0.725, "opp_share_base": 0.026, "opp_share_recent": 0.112, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": "fill-in?", "reason": "Last 2 games vs earlier: snap share 17% -> 73%, opportunity share 3% -> 11% (shift +3.2 SD). Context: same-position teammate(s) Ja'Marr Chase, Andrei Iosivas (missed wk 4) lost usage or missed time, so this may be fill-in work. Check their status.", "weeks": [1, 2, 3, 4], "snap": [0.16, 0.18, 0.56, 0.89], "opp": [0.033, 0.018, 0.091, 0.132]}, {"signal": "Waiver Riser", "player": "Kenyon Sadiq", "position": "TE", "team": "NYJ", "as_of_week": 4, "pct_rostered": 49.85, "pct_rostered_change": -0.08, "shift_score": 2.989, "snap_pct_base": 0.39, "snap_pct_recent": 0.635, "opp_share_base": 0.056, "opp_share_recent": 0.142, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": "fill-in?", "reason": "Last 2 games vs earlier: snap share 39% -> 64%, opportunity share 6% -> 14% (shift +3.0 SD). Context: same-position teammate(s) Mason Taylor (missed wk 4) lost usage or missed time, so this may be fill-in work. Check their status.", "weeks": [1, 2, 3, 4], "snap": [0.42, 0.36, 0.58, 0.69], "opp": [0.064, 0.048, 0.146, 0.138]}, {"signal": "Waiver Riser", "player": "Oronde Gadsden II", "position": "TE", "team": "LAC", "as_of_week": 4, "pct_rostered": 4.79, "pct_rostered_change": -0.01, "shift_score": 2.385, "snap_pct_base": 0.31, "snap_pct_recent": 0.56, "opp_share_base": 0.038, "opp_share_recent": 0.096, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": "fill-in?", "reason": "Last 2 games vs earlier: snap share 31% -> 56%, opportunity share 4% -> 10% (shift +2.4 SD). Context: same-position teammate(s) Charlie Kolar (missed wk 4) lost usage or missed time, so this may be fill-in work. Check their status.", "weeks": [1, 2, 3, 4], "snap": [0.18, 0.44, 0.57, 0.55], "opp": [0.042, 0.034, 0.049, 0.143]}, {"signal": "Waiver Riser", "player": "Chris Bell", "position": "WR", "team": "MIA", "as_of_week": 4, "pct_rostered": 3.96, "pct_rostered_change": 0.0, "shift_score": 2.023, "snap_pct_base": 0.465, "snap_pct_recent": 0.765, "opp_share_base": 0.032, "opp_share_recent": 0.096, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": "fill-in?", "reason": "Last 2 games vs earlier: snap share 46% -> 76%, opportunity share 3% -> 10% (shift +2.0 SD). Context: same-position teammate(s) Caleb Douglas (missed wk 4) lost usage or missed time, so this may be fill-in work. Check their status.", "weeks": [1, 2, 3, 4], "snap": [0.52, 0.41, 0.71, 0.82], "opp": [0.044, 0.019, 0.106, 0.086]}, {"signal": "Waiver Riser", "player": "Brenton Strange", "position": "TE", "team": "JAX", "as_of_week": 4, "pct_rostered": 27.16, "pct_rostered_change": 0.0, "shift_score": 2.003, "snap_pct_base": 0.755, "snap_pct_recent": 0.82, "opp_share_base": 0.048, "opp_share_recent": 0.124, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": "fill-in?", "reason": "Last 2 games vs earlier: snap share 76% -> 82%, opportunity share 5% -> 12% (shift +2.0 SD). Context: same-position teammate(s) Quintin Morris lost usage or missed time, so this may be fill-in work. Check their status.", "weeks": [1, 2, 3, 4], "snap": [0.68, 0.83, 0.77, 0.87], "opp": [0.057, 0.038, 0.088, 0.16]}, {"signal": "Injury Check", "player": "Saquon Barkley", "position": "RB", "team": "PHI", "as_of_week": 4, "pct_rostered": 98.45, "pct_rostered_change": -0.01, "shift_score": -0.186, "snap_pct_base": 0.435, "snap_pct_recent": 0.395, "opp_share_base": 0.226, "opp_share_recent": 0.222, "depth_chart_order": 3.0, "injury_status": "Out", "sleeper_adds_7d": 0.0, "sleeper_drops_7d": 0.0, "context": null, "reason": "Week 4 snap share 7% vs usual 71%. Likely left the game early; verify injury news.", "weeks": [1, 2, 3, 4], "snap": [0.71, 0.16, 0.72, 0.07], "opp": [0.362, 0.091, 0.386, 0.058]}, {"signal": "Injury Check", "player": "Rashee Rice", "position": "WR", "team": "KC", "as_of_week": 4, "pct_rostered": 97.04, "pct_rostered_change": -0.08, "shift_score": -0.681, "snap_pct_base": 0.81, "snap_pct_recent": 0.435, "opp_share_base": 0.058, "opp_share_recent": 0.094, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": null, "reason": "Week 4 snap share 10% vs usual 79%. Likely left the game early; verify injury news.", "weeks": [1, 2, 3, 4], "snap": [0.83, 0.79, 0.77, 0.1], "opp": [0.032, 0.083, 0.188, 0.0]}, {"signal": "Injury Check", "player": "Ja'Marr Chase", "position": "WR", "team": "CIN", "as_of_week": 4, "pct_rostered": 99.92, "pct_rostered_change": 0.0, "shift_score": -0.8, "snap_pct_base": 0.91, "snap_pct_recent": 0.6, "opp_share_base": 0.116, "opp_share_recent": 0.131, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": null, "reason": "Week 4 snap share 20% vs usual 94%. Likely left the game early; verify injury news.", "weeks": [1, 2, 3, 4], "snap": [0.94, 0.88, 1.0, 0.2], "opp": [0.066, 0.167, 0.218, 0.044]}, {"signal": "Fragile Starter", "player": "Ollie Gordon", "position": "RB", "team": "MIA", "as_of_week": 4, "pct_rostered": 73.56, "pct_rostered_change": -0.06, "shift_score": 4.203, "snap_pct_base": 0.13, "snap_pct_recent": 0.7, "opp_share_base": 0.029, "opp_share_recent": 0.309, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": null, "reason": "Snap share among the most volatile RBs (SD 30% game to game) [experimental]", "weeks": [1, 2, 3, 4], "snap": [0.07, 0.19, 0.84, 0.56], "opp": [0.0, 0.058, 0.303, 0.314]}, {"signal": "Fragile Starter", "player": "Braelon Allen", "position": "RB", "team": "NYJ", "as_of_week": 4, "pct_rostered": 76.46, "pct_rostered_change": -0.06, "shift_score": 2.901, "snap_pct_base": 0.355, "snap_pct_recent": 0.73, "opp_share_base": 0.136, "opp_share_recent": 0.339, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": null, "reason": "Snap share among the most volatile RBs (SD 24% game to game) [experimental]", "weeks": [1, 2, 3, 4], "snap": [0.4, 0.31, 0.52, 0.94], "opp": [0.177, 0.095, 0.127, 0.552]}, {"signal": "Fragile Starter", "player": "Emanuel Wilson", "position": "RB", "team": "SEA", "as_of_week": 4, "pct_rostered": 81.59, "pct_rostered_change": -0.11, "shift_score": 1.797, "snap_pct_base": 0.235, "snap_pct_recent": 0.48, "opp_share_base": 0.188, "opp_share_recent": 0.307, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": null, "reason": "Snap share among the most volatile RBs (SD 19% game to game) [experimental]", "weeks": [1, 2, 3, 4], "snap": [0.06, 0.41, 0.36, 0.6], "opp": [0.044, 0.333, 0.143, 0.472]}, {"signal": "Fragile Starter", "player": "Ladd McConkey", "position": "WR", "team": "LAC", "as_of_week": 4, "pct_rostered": 93.26, "pct_rostered_change": -0.03, "shift_score": -0.214, "snap_pct_base": 0.475, "snap_pct_recent": 0.61, "opp_share_base": 0.099, "opp_share_recent": 0.057, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": null, "reason": "Snap share among the most volatile WRs (SD 20% game to game) [experimental]", "weeks": [1, 2, 3, 4], "snap": [0.49, 0.46, 0.88, 0.34], "opp": [0.146, 0.052, 0.082, 0.032]}, {"signal": "Fragile Starter", "player": "Dalton Kincaid", "position": "TE", "team": "BUF", "as_of_week": 4, "pct_rostered": 87.3, "pct_rostered_change": -0.1, "shift_score": -2.026, "snap_pct_base": 0.69, "snap_pct_recent": 0.63, "opp_share_base": 0.124, "opp_share_recent": 0.045, "depth_chart_order": null, "injury_status": null, "sleeper_adds_7d": null, "sleeper_drops_7d": null, "context": null, "reason": "Usage falling: snap share 69% -> 63%, opportunity share 12% -> 5% (shift -2.0 SD)", "weeks": [1, 2, 3, 4], "snap": [0.72, 0.66, 0.67, 0.59], "opp": [0.122, 0.125, 0.051, 0.04]}], "backtest": [{"direction": "up", "threshold_sd": "no shift (|score|<0.5)", "flags": 3610, "flags_per_week": 69.4, "stayed_rate": 0.472, "kept_half_rate": 0.47}, {"direction": "up", "threshold_sd": "1.0", "flags": 1904, "flags_per_week": 36.6, "stayed_rate": 0.807, "kept_half_rate": 0.533}, {"direction": "up", "threshold_sd": "1.5", "flags": 976, "flags_per_week": 18.8, "stayed_rate": 0.857, "kept_half_rate": 0.565}, {"direction": "up", "threshold_sd": "2.0", "flags": 474, "flags_per_week": 9.1, "stayed_rate": 0.901, "kept_half_rate": 0.603}, {"direction": "up", "threshold_sd": "2.5", "flags": 237, "flags_per_week": 4.6, "stayed_rate": 0.932, "kept_half_rate": 0.633}, {"direction": "up", "threshold_sd": "3.0", "flags": 102, "flags_per_week": 2.0, "stayed_rate": 0.951, "kept_half_rate": 0.618}, {"direction": "down", "threshold_sd": "no shift (|score|<0.5)", "flags": 3593, "flags_per_week": 69.1, "stayed_rate": 0.54, "kept_half_rate": 0.535}, {"direction": "down", "threshold_sd": "1.0", "flags": 1416, "flags_per_week": 27.2, "stayed_rate": 0.837, "kept_half_rate": 0.574}, {"direction": "down", "threshold_sd": "1.5", "flags": 654, "flags_per_week": 12.6, "stayed_rate": 0.862, "kept_half_rate": 0.586}, {"direction": "down", "threshold_sd": "2.0", "flags": 282, "flags_per_week": 5.4, "stayed_rate": 0.89, "kept_half_rate": 0.571}, {"direction": "down", "threshold_sd": "2.5", "flags": 125, "flags_per_week": 2.4, "stayed_rate": 0.928, "kept_half_rate": 0.584}, {"direction": "down", "threshold_sd": "3.0", "flags": 42, "flags_per_week": 0.8, "stayed_rate": 0.952, "kept_half_rate": 0.548}], "fill_in": [{"fill_in": false, "flags": 131.0, "stayed_rate": 0.931, "kept_half_rate": 0.504}, {"fill_in": true, "flags": 343.0, "stayed_rate": 0.889, "kept_half_rate": 0.641}], "cusum_bt": [{"direction": "bleed", "threshold": "reference (tally = 0)", "new_flags_per_week": NaN, "hit_rate": 0.295, "flags": 7277}, {"direction": "bleed", "threshold": "tally <= -2", "new_flags_per_week": 3.1, "hit_rate": 0.777, "flags": 197}, {"direction": "bleed", "threshold": "tally <= -3", "new_flags_per_week": 1.7, "hit_rate": 0.811, "flags": 106}, {"direction": "bleed", "threshold": "tally <= -4", "new_flags_per_week": 1.0, "hit_rate": 0.864, "flags": 66}, {"direction": "bleed", "threshold": "tally <= -5", "new_flags_per_week": 0.8, "hit_rate": 0.898, "flags": 49}, {"direction": "climb", "threshold": "reference (tally = 0)", "new_flags_per_week": NaN, "hit_rate": 0.351, "flags": 9092}, {"direction": "climb", "threshold": "tally >= +2", "new_flags_per_week": 3.6, "hit_rate": 0.854, "flags": 233}, {"direction": "climb", "threshold": "tally >= +3", "new_flags_per_week": 2.2, "hit_rate": 0.914, "flags": 139}, {"direction": "climb", "threshold": "tally >= +4", "new_flags_per_week": 1.6, "hit_rate": 0.923, "flags": 104}, {"direction": "climb", "threshold": "tally >= +5", "new_flags_per_week": 1.1, "hit_rate": 0.945, "flags": 73}], "cases": [{"team": "HOU", "player": "Nick Chubb", "week": 1, "snap_pct": 0.51}, {"team": "HOU", "player": "Nick Chubb", "week": 2, "snap_pct": 0.53}, {"team": "HOU", "player": "Nick Chubb", "week": 3, "snap_pct": 0.52}, {"team": "HOU", "player": "Nick Chubb", "week": 4, "snap_pct": 0.42}, {"team": "HOU", "player": "Nick Chubb", "week": 5, "snap_pct": 0.34}, {"team": "HOU", "player": "Nick Chubb", "week": 7, "snap_pct": 0.25}, {"team": "HOU", "player": "Nick Chubb", "week": 8, "snap_pct": 0.44}, {"team": "HOU", "player": "Nick Chubb", "week": 9, "snap_pct": 0.36}, {"team": "HOU", "player": "Nick Chubb", "week": 10, "snap_pct": 0.13}, {"team": "HOU", "player": "Nick Chubb", "week": 11, "snap_pct": 0.26}, {"team": "HOU", "player": "Nick Chubb", "week": 12, "snap_pct": 0.22}, {"team": "HOU", "player": "Nick Chubb", "week": 13, "snap_pct": 0.34}, {"team": "HOU", "player": "Nick Chubb", "week": 14, "snap_pct": 0.11}, {"team": "HOU", "player": "Nick Chubb", "week": 16, "snap_pct": 0.32}, {"team": "HOU", "player": "Nick Chubb", "week": 17, "snap_pct": 0.08}, {"team": "HOU", "player": "Woody Marks", "week": 1, "snap_pct": 0.11}, {"team": "HOU", "player": "Woody Marks", "week": 2, "snap_pct": 0.27}, {"team": "HOU", "player": "Woody Marks", "week": 3, "snap_pct": 0.48}, {"team": "HOU", "player": "Woody Marks", "week": 4, "snap_pct": 0.56}, {"team": "HOU", "player": "Woody Marks", "week": 5, "snap_pct": 0.39}, {"team": "HOU", "player": "Woody Marks", "week": 7, "snap_pct": 0.63}, {"team": "HOU", "player": "Woody Marks", "week": 8, "snap_pct": 0.4}, {"team": "HOU", "player": "Woody Marks", "week": 9, "snap_pct": 0.48}, {"team": "HOU", "player": "Woody Marks", "week": 10, "snap_pct": 0.8}, {"team": "HOU", "player": "Woody Marks", "week": 11, "snap_pct": 0.66}, {"team": "HOU", "player": "Woody Marks", "week": 12, "snap_pct": 0.69}, {"team": "HOU", "player": "Woody Marks", "week": 13, "snap_pct": 0.54}, {"team": "HOU", "player": "Woody Marks", "week": 14, "snap_pct": 0.87}, {"team": "HOU", "player": "Woody Marks", "week": 15, "snap_pct": 0.22}, {"team": "HOU", "player": "Woody Marks", "week": 17, "snap_pct": 0.68}, {"team": "HOU", "player": "Woody Marks", "week": 18, "snap_pct": 0.46}, {"team": "MIN", "player": "Aaron Jones", "week": 1, "snap_pct": 0.5}, {"team": "MIN", "player": "Aaron Jones", "week": 2, "snap_pct": 0.43}, {"team": "MIN", "player": "Aaron Jones", "week": 8, "snap_pct": 0.53}, {"team": "MIN", "player": "Aaron Jones", "week": 9, "snap_pct": 0.42}, {"team": "MIN", "player": "Aaron Jones", "week": 10, "snap_pct": 0.71}, {"team": "MIN", "player": "Aaron Jones", "week": 11, "snap_pct": 0.67}, {"team": "MIN", "player": "Aaron Jones", "week": 12, "snap_pct": 0.66}, {"team": "MIN", "player": "Aaron Jones", "week": 13, "snap_pct": 0.37}, {"team": "MIN", "player": "Aaron Jones", "week": 14, "snap_pct": 0.45}, {"team": "MIN", "player": "Aaron Jones", "week": 15, "snap_pct": 0.58}, {"team": "MIN", "player": "Aaron Jones", "week": 16, "snap_pct": 0.64}, {"team": "MIN", "player": "Aaron Jones", "week": 17, "snap_pct": 0.65}, {"team": "MIN", "player": "Jordan Mason", "week": 1, "snap_pct": 0.54}, {"team": "MIN", "player": "Jordan Mason", "week": 2, "snap_pct": 0.6}, {"team": "MIN", "player": "Jordan Mason", "week": 3, "snap_pct": 0.6}, {"team": "MIN", "player": "Jordan Mason", "week": 4, "snap_pct": 0.62}, {"team": "MIN", "player": "Jordan Mason", "week": 5, "snap_pct": 0.66}, {"team": "MIN", "player": "Jordan Mason", "week": 7, "snap_pct": 0.77}, {"team": "MIN", "player": "Jordan Mason", "week": 8, "snap_pct": 0.35}, {"team": "MIN", "player": "Jordan Mason", "week": 9, "snap_pct": 0.6}, {"team": "MIN", "player": "Jordan Mason", "week": 10, "snap_pct": 0.25}, {"team": "MIN", "player": "Jordan Mason", "week": 11, "snap_pct": 0.16}, {"team": "MIN", "player": "Jordan Mason", "week": 12, "snap_pct": 0.27}, {"team": "MIN", "player": "Jordan Mason", "week": 13, "snap_pct": 0.29}, {"team": "MIN", "player": "Jordan Mason", "week": 14, "snap_pct": 0.3}, {"team": "MIN", "player": "Jordan Mason", "week": 15, "snap_pct": 0.36}, {"team": "MIN", "player": "Jordan Mason", "week": 16, "snap_pct": 0.07}, {"team": "MIN", "player": "Jordan Mason", "week": 18, "snap_pct": 0.4}], "case_flags": [{"player": "Nick Chubb", "season": 2025, "first_bleed_week": 13.0, "first_climb_week": null}, {"player": "Woody Marks", "season": 2025, "first_bleed_week": null, "first_climb_week": 7.0}, {"player": "Jordan Mason", "season": 2025, "first_bleed_week": 11.0, "first_climb_week": null}, {"player": "Aaron Jones", "season": 2025, "first_bleed_week": null, "first_climb_week": 16.0}], "n_players": 256};
+const pct = x => (x == null ? "–" : Math.round(x * 100) + "%");
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+const groups = [
+  { key: "Waiver Riser", cls: "rise", blurb: "Under 50% rostered, usage up at least 2 SD, now playing at least 35% of snaps." },
+  { key: "Fragile Starter", cls: "fragile", blurb: "Widely rostered, but usage is falling, a teammate is surging, or snaps swing a lot (volatility is experimental)." },
+  { key: "Injury Check", cls: "injury", blurb: "Widely rostered, latest game under half his usual snaps. Probably hurt mid-game, so check the news before reading it as a role change." },
+  { key: "Slow Bleed", cls: "fragile", blurb: "Widely rostered, bleed tally at or below −3." },
+  { key: "Slow Climb", cls: "rise", blurb: "Under 50% rostered, climb tally at or above +3." },
+];
+const counts = Object.fromEntries(groups.map(g => [g.key, D.flags.filter(f => f.signal === g.key).length]));
+
+const sb = document.getElementById("scoreboard");
+[["", D.n_players, "players scored"], ["k-rise", counts["Waiver Riser"] + counts["Slow Climb"], "waiver risers"],
+ ["k-fragile", counts["Fragile Starter"] + counts["Slow Bleed"], "fragile starters"], ["k-injury", counts["Injury Check"], "injury checks"]]
+  .forEach(([c, n, l]) => sb.append(el("div", c, `<b>${n}</b><span>${l}</span>`)));
+
+// Case-study charts: weekly snap share for a starter and a backup, with first-flag markers
+function caseChart(team, starter, backup) {
+  const rows = D.cases.filter(r => r.team === team);
+  const W = 520, H = 230, L = 38, R = 14, T = 30, B = 26;
+  const x = w => L + (w - 1) / 17 * (W - L - R), y = v => T + (1 - v) * (H - T - B);
+  let s = `<svg class="cchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${team} 2025 snap share, ${starter} vs ${backup}">`;
+  [0, 0.25, 0.5, 0.75, 1].forEach(v => s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 3.5}" text-anchor="end">${v * 100}%</text>`);
+  [1, 4, 7, 10, 13, 16, 18].forEach(w => s += `<text x="${x(w)}" y="${H - 8}" text-anchor="middle">W${w}</text>`);
+  const flags = Object.fromEntries(D.case_flags.map(f => [f.player, f]));
+  const series = [[starter, "var(--fragile)", "first_bleed_week", "bleed flag"], [backup, "var(--rise)", "first_climb_week", "climb flag"]];
+  series.forEach(([p, col, key, lab], si) => {
+    const wk = flags[p] && flags[p][key];
+    if (wk) {
+      s += `<line x1="${x(wk)}" x2="${x(wk)}" y1="${T - 8}" y2="${H - B}" stroke="${col}" stroke-dasharray="4 3" stroke-width="1.5"/>`;
+      const anchor = wk > 12 ? "end" : "start", dx = wk > 12 ? -5 : 5;
+      s += `<text class="flag" x="${x(wk) + dx}" y="${T - 12 + si * 0}" text-anchor="${anchor}" fill="${col}" style="fill:${col}">${p.split(" ").slice(-1)[0]} ${lab} · W${wk}</text>`;
+    }
+  });
+  series.forEach(([p, col]) => {
+    const pts = rows.filter(r => r.player === p).sort((a, b) => a.week - b.week);
+    s += `<polyline points="${pts.map(r => `${x(r.week)},${y(r.snap_pct)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round"/>`;
+    pts.forEach(r => s += `<circle cx="${x(r.week)}" cy="${y(r.snap_pct)}" r="2.6" fill="var(--surface)" stroke="${col}" stroke-width="1.6"/>`);
+  });
+  return s + "</svg>";
+}
+const caseDefs = [
+  ["HOU", "Nick Chubb", "Woody Marks", "Houston", "Marks's climb flag fired 6 weeks before Chubb's bleed flag. Watching the backup gives the earlier warning."],
+  ["MIN", "Jordan Mason", "Aaron Jones", "Minnesota", "Mason's bleed flag fired in Week 11. Jones missed early games, so his established level was set late and his climb flag came in Week 16."],
+];
+const cw = document.getElementById("cases");
+caseDefs.forEach(([team, st, bk, name, note]) => {
+  const c = el("div", "case");
+  c.innerHTML = `<h3>${name} 2025 · ${st} vs. ${bk}</h3>
+    <div class="key"><span style="--k:var(--fragile)">${st} (veteran)</span><span style="--k:var(--rise)">${bk} (rising)</span></div>
+    ${caseChart(team, st, bk)}<p>${note}</p>`;
+  cw.append(c);
+});
+
+function spark(f) {
+  const W = 240, H = 74, L = 30, R = 8, T = 8, B = 18;
+  const xs = f.weeks, n = xs.length;
+  const wmin = Math.min(...xs), wmax = Math.max(...xs);
+  const x = w => L + (wmax === wmin ? 0 : (w - wmin) / (wmax - wmin)) * (W - L - R);
+  const y = v => T + (1 - v) * (H - T - B);
+  let s = `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${f.player} snap share by week">`;
+  [0, 0.5, 1].forEach(v => s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 3}" text-anchor="end">${v * 100}%</text>`);
+  if (n >= 2) { const a = x(xs[n - 2]) - 8, b = x(xs[n - 1]) + 8; s += `<rect x="${a}" y="${T}" width="${b - a}" height="${H - T - B}" fill="var(--line)" opacity="0.55"/>`; }
+  if (f.snap_pct_base != null && n >= 3) s += `<line x1="${x(xs[0])}" x2="${x(xs[n - 3])}" y1="${y(f.snap_pct_base)}" y2="${y(f.snap_pct_base)}" stroke="var(--muted)" stroke-dasharray="3 3" stroke-width="1.5"/>`;
+  s += `<polyline points="${xs.map((w, i) => `${x(w)},${y(f.snap[i])}`).join(" ")}" fill="none" stroke="var(--c)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  xs.forEach((w, i) => { s += `<circle cx="${x(w)}" cy="${y(f.snap[i])}" r="${i === n - 1 ? 3.6 : 2.6}" fill="${i === n - 1 ? "var(--c)" : "var(--surface)"}" stroke="var(--c)" stroke-width="1.6"/><text x="${x(w)}" y="${H - 4}" text-anchor="middle">W${w}</text>`; });
+  return s + "</svg>";
+}
+
+const gwrap = document.getElementById("groups");
+groups.forEach(g => {
+  const items = D.flags.filter(f => f.signal === g.key);
+  if (!items.length) return;
+  const box = el("div", "group " + g.cls);
+  box.append(el("div", "group-head", `<h3 style="color:var(--c)">${g.key}s · ${items.length}</h3><p>${g.blurb}</p>`));
+  const cards = el("div", "cards");
+  items.forEach(f => {
+    const c = el("article", "card");
+    const score = f.shift_score == null || f.signal === "Injury Check" ? "" : `<span>shift <b>${f.shift_score > 0 ? "+" : ""}${f.shift_score.toFixed(1)}</b> SD</span>`;
+    const inj = f.injury_status ? `<span>Sleeper: <b>${f.injury_status}</b></span>` : "";
+    const reason = f.reason.replace(/^Last 2 games vs earlier: /, "").replace(/ Context:.*$/, "").replace(/->/g, "→");
+    const ctxMatch = f.reason.match(/teammate\(s\) (.*?) lost usage/);
+    const ctx = f.signal === "Waiver Riser" ? (ctxMatch ? `Covering for: ${ctxMatch[1]}?` : "No teammate absent: role may be earned") : "";
+    c.innerHTML = `<div class="top"><span class="name">${f.player}</span><span class="chip">${f.position} · ${f.team}</span></div>
+      <div class="meta"><span><b>${f.pct_rostered.toFixed(1)}%</b> rostered</span>${score}${inj}</div>
+      ${f.weeks && f.weeks.length ? spark(f) : ""}<p class="reason">${reason}</p>${ctx ? `<span class="ctx">${ctx}</span>` : ""}`;
+    cards.append(c);
+  });
+  box.append(cards); gwrap.append(box);
+});
+
+const bar = (v, w = 56) => `<div class="bar"><s style="width:${v * w}px"></s>${pct(v)}</div>`;
+const bt = document.getElementById("bt");
+bt.innerHTML = `<thead><tr><th>Threshold</th><th>Per week</th><th>Stayed up</th></tr></thead>`;
+const tb = el("tbody");
+D.backtest.filter(r => r.direction === "up").forEach(r => {
+  const isRef = isNaN(parseFloat(r.threshold_sd)), k = parseFloat(r.threshold_sd);
+  const tr = el("tr", isRef ? "ref" : (k === 2 ? "pick" : ""));
+  tr.innerHTML = `<td>${isRef ? "no real change" : `≥ +${k.toFixed(1)} SD`}</td><td>${isRef ? "–" : r.flags_per_week}</td><td>${bar(r.stayed_rate)}</td>`;
+  tb.append(tr);
+});
+bt.append(tb);
+
+const cbt = document.getElementById("cbt");
+cbt.innerHTML = `<thead><tr><th>Tally</th><th>New / week</th><th>Hit rate</th></tr></thead>`;
+const cb = el("tbody");
+D.cusum_bt.filter(r => !/[45]$/.test(r.threshold)).forEach(r => {
+  const isRef = /reference/.test(r.threshold);
+  const tr = el("tr", isRef ? "ref" : (/3$/.test(r.threshold) ? "pick" : ""));
+  const label = isRef ? `${r.direction}: no signal` : r.threshold.replace("tally ", `${r.direction} `).replace("<= -", "≤ −").replace(">= +", "≥ +");
+  tr.innerHTML = `<td>${label}</td><td>${isRef ? "–" : r.new_flags_per_week}</td><td>${bar(r.hit_rate)}</td>`;
+  cb.append(tr);
+});
+cbt.append(cb);
+
+const fi = Object.fromEntries(D.fill_in.map(r => [String(r.fill_in).toLowerCase(), r]));
+const fillShare = fi.true.flags / (fi.true.flags + fi.false.flags);
+const thisWeekFill = D.flags.filter(f => f.signal === "Waiver Riser" && /teammate\(s\)/.test(f.reason)).length;
+const findings = [
+  ["6 wks", "The backup's climb is the early warning.", "In Houston, Woody Marks's climb tally crossed the line in Week 7. Nick Chubb's own bleed tally didn't cross until Week 13. A Role Instability view should show the rising teammate next to the starter."],
+  [pct(fillShare), "Most big jumps are fill-in work.", `Of the sudden rises of 2 SD or more in 2022–25, ${pct(fillShare)} happened while a same-position regular was out. This week ${thisWeekFill} of ${counts["Waiver Riser"]} risers fit that pattern. Separating earned roles from borrowed ones may be the most useful thing Phase 2 can do.`],
+  ["3", "In-game injuries look like lost roles.", "Chase, Barkley and Rice each played a sliver of Week 4 snaps, and a naive volatility metric called them unstable. They now go to Injury Check, which Sleeper's injury status can confirm. The same filter first hid Chubb's real decline, which is why CUSUM caps outlier games instead of dropping them."],
+  ["1 tool", "No single window catches everything.", "A 5-game trend line never flagged Chubb (its best score was −1.1). The 2-game shift score is fast but jumpy. CUSUM is reliable but slow early in the season. Using them together covers more cases than any one alone."],
+];
+const fw = document.getElementById("findings");
+findings.forEach(([big, head, body]) => fw.append(el("div", "finding", `<div class="big">${big}</div><p><strong>${head}</strong>${body}</p>`)));
+</script>

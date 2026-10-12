@@ -19,8 +19,15 @@ venv/
 # Data and generated artifacts
 data/*
 !data/README.md
+!data/raw/
+!data/processed/
+data/raw/*
+data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+# Rostership snapshots are committed: ESPN only serves today's number, so past
+# weeks can't be re-downloaded. Small CSVs (~40 KB/week).
+!data/raw/rostership/
 results/*
 !results/.gitkeep
 models/*

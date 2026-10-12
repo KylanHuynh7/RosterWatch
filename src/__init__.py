@@ -1,1 +1,1 @@
-"""Starter package for DS3 project code."""
+"""RosterWatch: flags NFL players whose real usage (snaps, touches, targets) is shifting."""

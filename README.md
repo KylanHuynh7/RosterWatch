@@ -1,6 +1,89 @@
 # RosterWatch
 
-A UC San Diego DS3 project, built on the DS3 project template. RosterWatch flags NFL skill players whose **real usage** (snap share, share of team targets + carries) is shifting:
+A UC San Diego DS3 project, built on the DS3 project template. RosterWatch flags NFL skill players (RB, WR, TE) whose **real usage** (snap share, share of team targets + carries) is shifting, and backs every flag with transparent, backtested statistics.
+
+## What this repo includes
+
+- The DS3 template's folder structure, Python environment file, `.gitignore`, and starter package with a test example
+- A weekly data pipeline: nflverse (snaps, stats, play-by-play), Sleeper (depth chart, injuries, trending adds/drops) and ESPN (% rostered)
+- Two detectors: a **shift score** for sudden usage changes (Phase 1) and a **CUSUM** tally for slow multi-week bleeds and climbs (Phase 2)
+- Backtests on 2022–2025 that justify each flag threshold
+- Dashboard-ready outputs, a BigQuery loader, starter SQL queries, and tests
+
+## Repository structure
+
+```text
+.
+├── README.md
+├── .env.example            # settings + GCP placeholders; copy to .env
+├── .gitignore
+├── requirements.txt
+├── notebooks/
+│   ├── README.md
+│   └── 01_houston_case_study.ipynb   # Chubb vs. Marks, 2025
+├── src/
+│   ├── __init__.py
+│   ├── example.py          # DS3 template example
+│   ├── config.py           # paths + settings (reads .env)
+│   ├── data.py             # nflverse, Sleeper and ESPN loaders
+│   ├── signals.py          # Phase 1: shift score + flag rules
+│   ├── trend.py            # Phase 2: CUSUM slow bleed / climb (+ an earlier trend-line attempt kept for comparison)
+│   ├── backtest.py         # threshold evaluation on 2022-2025
+│   ├── warehouse.py        # uploads tables to BigQuery
+│   ├── pipeline.py         # runs everything -> results/
+│   └── brief.py            # fills frontend/brief_template.html
+├── frontend/
+│   ├── README.md           # dashboard (Looker Studio / Data Studio) plan
+│   └── brief_template.html # one-page summary template
+├── infra/
+│   ├── README.md           # BigQuery setup
+│   └── bigquery/           # starter SQL queries
+├── docs/
+│   ├── AGENTS.md           # instructions for AI coding tools working in this repo
+│   ├── codeReviewer.md     # DS3 code-review checklist (run before opening a PR)
+│   ├── DesignDoc.md        # design document
+│   └── proposed_issues.md  # starting backlog for GitHub Issues
+├── data/
+│   ├── raw/                # API pulls; rostership/ snapshots are committed
+│   └── processed/          # weekly usage table (generated)
+├── results/                # dashboard CSVs + brief.html (generated, not committed)
+├── models/                 # fitted noise calibrations (generated, not committed)
+└── tests/                  # pytest on synthetic players
+```
+
+- `frontend/` is for UI/UX code and web app assets.
+- `infra/` is for deployment scripts, cloud config, and infrastructure as code for AWS/GCP.
+
+## Quick start
+
+1. Create a virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   **.env files are generally not shared on GitHub; they are included here only as an example template.**
+4. Run the pipeline from the repo root. It writes the dashboard CSVs and `results/brief.html`:
+   ```bash
+   python -m src.pipeline                   # default: shift threshold 2.0 SD, CUSUM +/-3
+   python -m src.pipeline --threshold 1.5   # more flags, lower hit rate
+   python -m src.pipeline --bigquery        # also upload to BigQuery (setup: infra/README.md)
+   ```
+5. Run the tests:
+   ```bash
+   pytest
+   ```
+
+The first run downloads about 5 seasons of data (around a minute) and caches it in `data/`. To pull fresh weekly data, delete the files in `data/processed/` and rerun. Keep `data/raw/rostership/`: past snapshots can't be downloaded again.
+
+## Signals
 
 | Signal | Who | Rule (default) |
 |---|---|---|
@@ -11,83 +94,6 @@ A UC San Diego DS3 project, built on the DS3 project template. RosterWatch flags
 | **Slow Climb** *(Phase 2)* | < 50% rostered | CUSUM climb tally ≥ +3 |
 
 Every flag has a plain-English `reason`, plus `context` that says whether a same-position teammate lost snaps or missed the game (possible fill-in work).
-
-## Quick start
-
-1. Create a virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Copy the example environment file (`.env` is never committed):
-
-```bash
-cp .env.example .env
-```
-
-4. Run the pipeline from the repo root. It writes the dashboard CSVs and `results/brief.html`:
-
-```bash
-python -m src.pipeline                   # default: shift threshold 2.0 SD, CUSUM +/-3
-python -m src.pipeline --threshold 1.5   # more flags, lower hit rate
-```
-
-5. (Optional) Upload to BigQuery. Setup steps are in `infra/README.md`:
-
-```bash
-python -m src.warehouse --dry-run
-```
-
-6. Run the tests:
-
-```bash
-pytest
-```
-
-The first run downloads about 5 seasons of data (around a minute) and caches it in `data/`. Delete the files in `data/processed/` and `data/raw/` (not `data/raw/rostership/`) to pull fresh weekly data.
-
-## Repository structure
-
-```
-.
-├── README.md
-├── .env.example            # settings + GCP placeholders; copy to .env
-├── .gitignore
-├── requirements.txt
-├── notebooks/              # exploration only, e.g. 01_houston_case_study.ipynb
-├── src/
-│   ├── __init__.py
-│   ├── example.py          # DS3 template example
-│   ├── config.py           # paths + settings (reads .env)
-│   ├── data.py             # nflverse, Sleeper, ESPN loaders
-│   ├── signals.py          # Phase 1: shift score + flag rules
-│   ├── trend.py            # Phase 2: CUSUM slow bleed / climb
-│   ├── backtest.py         # threshold evaluation on 2022-2025
-│   ├── warehouse.py        # uploads tables to BigQuery
-│   ├── pipeline.py         # runs everything -> results/
-│   └── brief.py            # fills frontend/brief_template.html
-├── frontend/               # brief template + Looker Studio plan
-├── infra/                  # BigQuery setup + starter SQL (infra/bigquery/)
-├── docs/
-│   ├── AGENTS.md           # instructions for AI coding tools working in this repo
-│   ├── codeReviewer.md     # DS3 code-review checklist (run before opening a PR)
-│   ├── DesignDoc.md        # design document
-│   └── proposed_issues.md  # starting backlog for GitHub Issues
-├── data/
-│   ├── raw/                # API pulls (rostership/ snapshots are committed)
-│   └── processed/          # weekly usage table
-├── results/                # dashboard CSVs + brief.html (generated, not committed)
-├── models/                 # fitted noise calibrations (JSON, generated, not committed)
-└── tests/                  # pytest on synthetic players
-```
 
 ## The method in plain terms
 
@@ -119,34 +125,22 @@ Backtest (`results/backtest_cusum.csv`): a first crossing of −3 is followed by
 
 **Passing-down share** = share of the team's targets + carries on 3rd/4th down or in the last 2 minutes of a half, computed from play-by-play. **Red-zone share** is computed the same way for plays inside the opponent's 20.
 
-## Code
-
-| File | What |
-|---|---|
-| `src/data.py` | Loads nflverse data (`nflreadpy`, including play-by-play situational shares), Sleeper (depth chart, injury status, trending adds/drops) and ESPN % rostered |
-| `src/signals.py` | Windows, noise model, shift scores, flag rules |
-| `src/backtest.py` | Threshold sweep + fill-in vs. earned comparison |
-| `src/trend.py` | Phase 2: CUSUM slow bleed/climb, its backtest, case studies (+ an earlier 5-game-slope attempt kept for comparison) |
-| `src/pipeline.py` | Runs everything, writes `results/*.csv`, `models/*.json`, `results/brief.html` |
-| `src/brief.py` | Rebuilds `results/brief.html` from `results/` |
-| `src/warehouse.py` | Uploads all tables to BigQuery (`--dry-run` to preview) |
-
-### Outputs in `results/` (Looker Studio-ready)
+## Outputs in `results/`
 
 - `signals_current.csv`: this week's flags with reasons → the main dashboard table
-- `shift_scores_current.csv`: every player's scores → scatter (shift score vs. % rostered)
+- `shift_scores_current.csv`, `cusum_current.csv`: every player's scores
 - `usage_trends_current.csv`: player-game usage → line charts per player
-- `backtest_thresholds.csv`, `backtest_fill_in.csv`: methodology page
+- `backtest_thresholds.csv`, `backtest_cusum.csv`, `backtest_fill_in.csv`, `case_studies.csv`: methodology evidence
 - `data/raw/rostership/rostership_snapshot_<date>.csv`: ESPN only exposes *today's* % rostered, so every pull is kept and committed
 
-To get these into Looker Studio: upload the CSVs to Google Sheets (one tab each), then in Looker Studio choose Add data → Google Sheets. Later, a scheduled script can push to Sheets or BigQuery automatically.
+`python -m src.warehouse` uploads all of these to BigQuery, where the dashboard reads them (see `infra/README.md` and `frontend/README.md`).
 
-## Known limitations (good discussion items)
+## Known limitations
 
 - **Small samples early in the season:** at week 4 the baseline is just 2 games.
-- **2-game vs. 3-game recent window:** 3 games is more reliable (slope 0.69 vs. 0.59) but flags a week later.
+- **2-game vs. 3-game recent window:** 3 games was more reliable in testing but flags a week later.
 - **Noise is pooled per position:** a 90% snap player and a 30% snap player shouldn't have the same noise scale. A binomial or level-dependent model would fix this.
-- **Injury handling is heuristic:** the "sudden drop" and "absent teammate" rules come from snap data only. Joining `nflreadpy.load_injuries()` would be more precise.
+- **Injury handling is heuristic:** the "sudden drop", "bounce-back" and "absent teammate" rules come from snap data. Sleeper injury status is attached to each flag for checking; joining `nflreadpy.load_injuries()` would be more precise.
 - **Volatility flag isn't backtested yet.**
 - **Rostership:** Sleeper (our planned source) has no "% rostered", only top-100 trending adds/drops. ESPN's undocumented API fills the gap for now. Decide with the mentor.
 - **CUSUM is quiet early in the season:** it needs 3 games to set the established level. Using last season as a prior would fix that.
@@ -154,11 +148,11 @@ To get these into Looker Studio: upload the CSVs to Google Sheets (one tab each)
 
 ## Repository guidelines
 
-* Keep notebooks for exploration and visualization.
-* Put reusable logic in `src` so notebooks stay readable.
-* Do not commit secrets, API keys, or large data files.
-* Use clear filenames and short, documented functions.
-* Add tests for any core logic that will be reused.
+- Keep notebooks for exploration and visualization.
+- Put reusable logic in src so notebooks stay readable.
+- Do not commit secrets, API keys, or large data files.
+- Use clear filenames and short, documented functions.
+- Add tests for any core logic that will be reused.
 
 ## Git and GitHub workflow for DS3 projects
 
@@ -250,3 +244,15 @@ git push origin feature/data-cleaning
 ```
 
 Then open a Pull Request on GitHub and wait for approval from the appropriate project manager or mentor.
+
+## Notes for DS3 projects
+
+This template is intentionally simple so students can focus on the science instead of setup. As projects grow, teams can add:
+
+- experiment tracking
+- model checkpoints
+- deployment scripts
+- cloud infrastructure (AWS/GCP) in `infra/`
+- frontend UI/UX code in `frontend/`
+- CI checks
+- docs pages

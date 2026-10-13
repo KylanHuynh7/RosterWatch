@@ -157,22 +157,3 @@ To get these into Looker Studio: upload the CSVs to Google Sheets (one tab each)
 * Do not commit secrets, API keys, or large data files.
 * Use clear filenames and short, documented functions.
 * Add tests for any core logic that will be reused.
-
-## Git and GitHub workflow
-
-1. **Issues:** one per task, bug, experiment or feature, with a short title, a clear description, acceptance criteria and labels (`bug`, `enhancement`, `documentation`, `blocked`). A starting backlog is in `docs/proposed_issues.md`.
-2. **Branches:** one per person or feature, such as `feature/bigquery-load`.
-3. **Pull requests:** open a PR from your branch into `main`. **Only project managers or mentors approve PRs.**
-
-```bash
-git checkout main
-git pull origin main
-git checkout -b feature/my-task
-git add .
-git commit -m "Describe your change"
-git push origin feature/my-task
-```
-
-Then open a Pull Request on GitHub and wait for approval from the project manager or mentor.
-
-Team habits: pull before starting work, keep commits small and descriptive, open PRs early for feedback, and resolve merge conflicts carefully and with the team.

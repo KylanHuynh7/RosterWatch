@@ -98,13 +98,15 @@ The first run downloads about 5 seasons of data (around a minute) and caches it 
 
 | Threshold | Flags/week (league-wide) | Stayed above old baseline | Kept ≥ half the gain |
 |---|---|---|---|
-| no shift (reference) | – | 47% | 47% |
-| ≥ 1.0 SD | 36.6 | 81% | 53% |
-| ≥ 1.5 SD | 18.8 | 86% | 57% |
-| **≥ 2.0 SD** | **9.1** | **90%** | **60%** |
-| ≥ 2.5 SD | 4.6 | 93% | 63% |
+| no shift (reference) | – | 46% | 46% |
+| ≥ 1.0 SD | 35.9 | 81% | 53% |
+| ≥ 1.5 SD | 18.6 | 86% | 57% |
+| **≥ 2.0 SD** | **9.1** | **90.5%** | **60%** |
+| ≥ 2.5 SD | 4.8 | 92% | 62% |
 
-Persistence slope ≈ 0.59: on average, about 60% of a 2-game usage shift is still there over the next 3 games.
+Persistence slope ≈ 0.61: on average, about 60% of a 2-game usage shift is still there over the next 3 games.
+
+**Injury blips are left out of both averages.** A game where a regular's snap share fell below half his usual level, followed by a bounce-back game, is treated as an in-game injury, not a role change (for example, Ja'Marr Chase in 2026: 94%, 88%, 100%, **20%**, 89%). A drop with no bounce-back stays in, since that may be a real benching. Falling-usage flags at −2 SD now stay down 92.7% of the time (previously 89.0%).
 
 ### Phase 2: slow bleed (CUSUM, `trend.py`)
 
@@ -157,3 +159,94 @@ To get these into Looker Studio: upload the CSVs to Google Sheets (one tab each)
 * Do not commit secrets, API keys, or large data files.
 * Use clear filenames and short, documented functions.
 * Add tests for any core logic that will be reused.
+
+## Git and GitHub workflow for DS3 projects
+
+Using Git and GitHub well is just as important as writing good code. A clean workflow makes collaboration easier and helps the project stay organized.
+
+### 1. Use GitHub Issues for tracking work
+
+Create an Issue for each task, bug, experiment, or feature request. Keep each issue focused and include:
+
+- a short title
+- a clear description of the work
+- acceptance criteria if relevant
+- labels such as bug, enhancement, documentation, or blocked
+
+Example workflow:
+- one issue for data cleaning
+- one issue for model training
+- one issue for documentation updates
+
+### 2. Use branches to separate work
+
+Each person or feature should usually work in its own branch. This prevents people from overwriting each other's changes.
+
+Common branch commands:
+
+```bash
+git branch
+git checkout -b feature/my-task
+git checkout main
+git branch -d feature/my-task
+```
+
+What they mean:
+- `git branch` shows existing branches
+- `git checkout -b feature/my-task` creates and switches to a new branch
+- `git checkout main` switches back to the main branch
+- `git branch -d feature/my-task` deletes a branch after it is merged
+
+### 3. Use pull requests to merge code into main
+
+When work is complete, open a Pull Request (PR) from your branch into `main`. A PR is the place to review changes, discuss issues, and confirm everything is ready.
+
+Important rule:
+- Only project managers or mentors should approve pull requests.
+- Students should contribute code, but approvals should be handled by the designated maintainers.
+
+### 4. Basic Git commands and what they mean
+
+```bash
+git clone <repo-url>
+git status
+git add <file>
+git add .
+git commit -m "Describe your change"
+git push origin <branch-name>
+git log
+git merge <branch-name>
+git rebase <branch-name>
+```
+
+What they mean:
+- `git clone` copies a repository from GitHub to your local machine
+- `git status` shows which files changed and what branch you are on
+- `git add` stages files for commit
+- `git commit` saves staged changes with a message
+- `git push` uploads your local commits to GitHub
+- `git log` shows recent commit history
+- `git merge` combines another branch into your current branch
+- `git rebase` reapplies your commits on top of another branch and can help keep history cleaner
+
+### 5. Recommended team habits
+
+- Pull the latest changes before starting work
+- Keep commits small and descriptive
+- Avoid committing large data files or secrets
+- Open a PR early for feedback, not only at the end
+- Resolve merge conflicts carefully and communicate with the team
+
+### 6. Example workflow
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b feature/data-cleaning
+git status
+git add .
+git commit -m "Add initial data cleaning script"
+git push origin feature/data-cleaning
+```
+
+Then open a Pull Request on GitHub and wait for approval from the appropriate project manager or mentor.

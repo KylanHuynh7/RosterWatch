@@ -40,6 +40,20 @@ def test_shift_score_positive_for_a_riser_and_negative_for_a_faller():
     assert fall.shift_score.iloc[0] < -2
 
 
+def test_injury_blip_does_not_fake_a_falling_role():
+    # Ja'Marr Chase, 2026: left week 4 hurt (20%), back to 89% in week 5. Not a role change.
+    chase = signals.score(signals.build_windows(make_player([0.94, 0.88, 1.0, 0.20, 0.89])), SHIFT_NOISE)
+    assert chase.injury_games_excluded.iloc[0] == 1
+    assert chase.shift_score.iloc[0] > -1
+
+
+def test_real_benching_is_still_flagged():
+    # Two low games in a row, no bounce-back: that can be a real role loss, so it must count.
+    benched = signals.score(signals.build_windows(make_player([0.9, 0.9, 0.9, 0.3, 0.3])), SHIFT_NOISE)
+    assert benched.injury_games_excluded.iloc[0] == 0
+    assert benched.shift_score.iloc[0] < -2
+
+
 def test_shift_score_needs_enough_games():
     # 3 games = 1 baseline game, below MIN_BASELINE_GAMES -> no window
     assert signals.build_windows(make_player([0.5, 0.5, 0.9])).empty
@@ -72,3 +86,9 @@ def test_cusum_one_injury_game_cannot_trigger_a_flag_alone():
     path = trend.cusum_path(make_player([0.9, 0.9, 0.9, 0.0]), GAME_NOISE)
     assert path.cusum_bleed.iloc[-1] == -(trend.CUSUM_CAP - trend.CUSUM_K)
     assert path.cusum_bleed.iloc[-1] > -3
+
+
+def test_injury_check_survives_when_too_few_games_for_a_shift_score():
+    # Saquon Barkley, 2026: early dip he bounced back from, then hurt again in his latest game.
+    saquon = signals.build_windows(make_player([0.71, 0.16, 0.72, 0.07]))
+    assert len(saquon) == 1 and bool(saquon.sudden_drop.iloc[0])

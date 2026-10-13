@@ -38,10 +38,22 @@ def build_windows(usage, with_future=False):
         start = RECENT_GAMES + MIN_BASELINE_GAMES - 1
         idxs = range(start, n) if with_future else ([n - 1] if n - 1 >= start else [])
         for i in idxs:
-            base = vals[: i - RECENT_GAMES + 1]
-            recent = vals[i - RECENT_GAMES + 1: i + 1]
+            # Leave out injury blips (a sudden drop he bounced back from) so one
+            # in-game injury can't fake a role change. A drop he did NOT bounce back
+            # from stays in: that may be a real benching.
+            blips = _injury_blips(drop, i)
+            keep = np.flatnonzero(~blips)
+            if len(keep) >= RECENT_GAMES + MIN_BASELINE_GAMES:
+                base = vals[keep[:-RECENT_GAMES]]
+                recent = vals[keep[-RECENT_GAMES:]]
+            elif drop[i] and not with_future:
+                # Too few usable games for a shift score, but the latest game is a
+                # sudden drop: keep the row so flag() can still raise an Injury Check.
+                base = recent = np.full((1, len(METRICS)), np.nan)
+            else:
+                continue
             row = {"season": season, "pfr_player_id": pid, "as_of_week": weeks[i],
-                   "games_in_baseline": len(base)}
+                   "games_in_baseline": len(base), "injury_games_excluded": int(blips.sum())}
             for j, m in enumerate(METRICS):
                 row[f"{m}_base"] = base[:, j].mean()
                 row[f"{m}_recent"] = recent[:, j].mean()
@@ -74,6 +86,17 @@ def _sudden_drops(snap):
         usual = np.median(snap[:k])
         out[k] = usual >= 0.5 and snap[k] < SUDDEN_DROP * usual
     return out
+
+
+def _injury_blips(drop, i):
+    """Mask over games 0..i: True where game k was a sudden drop AND the player bounced
+    back in his next game (k + 1 <= i, not a drop). Uses only games up to i, so the
+    backtest never sees the future. The latest game is never a blip (no next game yet);
+    if it is a drop, flag() reports it as an Injury Check instead."""
+    blips = np.zeros(i + 1, dtype=bool)
+    for k in range(i):
+        blips[k] = drop[k] and not drop[k + 1]
+    return blips
 
 
 def fit_noise(hist_windows):
@@ -135,6 +158,9 @@ def flag(scored, rostership, threshold, usage, rostered_cut=50.0):
         key = (r.team, r.position)
         change = (f"snap share {pct(r.snap_pct_base)} -> {pct(r.snap_pct_recent)}, "
                   f"opportunity share {pct(r.opp_share_base)} -> {pct(r.opp_share_recent)}")
+        n_excl = int(r.get("injury_games_excluded", 0) or 0)
+        if n_excl:
+            change += f" (leaving out {n_excl} game{'s' if n_excl > 1 else ''} he left early and bounced back from)"
         if r.pct_rostered < rostered_cut and is_riser[_]:
             vacated = [m for m in fading.get(key, []) if m != r.player]
             ctx = (f" Context: same-position teammate(s) {', '.join(vacated)} lost usage or missed time, so "

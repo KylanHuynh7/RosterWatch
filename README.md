@@ -27,7 +27,7 @@ A UC San Diego DS3 project, built on the DS3 project template. RosterWatch flags
 │   ├── config.py           # paths + settings (reads .env)
 │   ├── data.py             # nflverse, Sleeper and ESPN loaders
 │   ├── signals.py          # Phase 1: shift score + flag rules
-│   ├── trend.py            # Phase 2: CUSUM slow bleed / climb (+ an earlier trend-line attempt kept for comparison)
+│   ├── trend.py            # Phase 2: CUSUM slow bleed / climb
 │   ├── backtest.py         # threshold evaluation on 2022-2025
 │   ├── warehouse.py        # uploads tables to BigQuery
 │   ├── pipeline.py         # runs everything -> results/

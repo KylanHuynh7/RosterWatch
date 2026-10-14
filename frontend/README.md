@@ -1,8 +1,8 @@
 # Frontend
 
-## Looker Studio dashboard (planned)
+## Looker Studio dashboard
 
-The pipeline writes one tidy table per view to `results/`. Later these go to BigQuery (see `infra/`). Until then, upload them to Google Sheets and connect Looker Studio with Add data → Google Sheets.
+The pipeline writes one tidy table per view to `results/`, and `python -m src.pipeline --bigquery` uploads them to BigQuery, where the dashboard reads them. Setup steps are in `infra/README.md`.
 
 | View | Source table | Charts |
 |---|---|---|

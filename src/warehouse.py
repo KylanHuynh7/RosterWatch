@@ -21,15 +21,18 @@ LOCATION = os.environ.get("BQ_LOCATION", "US")
 def collect_tables():
     """Return {table_name: DataFrame} for everything that should live in BigQuery."""
     tables = {}
-    usage = sorted(config.PROCESSED.glob("usage_*.parquet"))
-    if usage:
-        tables["weekly_usage"] = pd.read_parquet(usage[-1])
+    clean = {"weekly_usage": "usage_*.parquet", "snap_counts": "snap_counts_*.parquet",
+             "pbp_plays": "pbp_plays_*.parquet", "player_ids": "player_ids_*.parquet"}
+    for name, pattern in clean.items():
+        files = sorted(config.PROCESSED.glob(pattern))
+        if files:
+            tables[name] = pd.read_parquet(files[-1])
     for csv in sorted(config.RESULTS.glob("*.csv")):
         tables[csv.stem] = pd.read_csv(csv)
     snaps = sorted(config.ROSTERSHIP_SNAPSHOTS.glob("rostership_snapshot_*.csv"))
     if snaps:
         tables["rostership_snapshots"] = pd.concat([pd.read_csv(f) for f in snaps], ignore_index=True)
-    sleeper = sorted(config.RAW.glob("sleeper_*.parquet"))
+    sleeper = sorted(config.RAW.glob("sleeper_v2_*.parquet")) or sorted(config.RAW.glob("sleeper_*.parquet"))
     if sleeper:
         tables["sleeper_players"] = pd.read_parquet(sleeper[-1])
     for df in tables.values():

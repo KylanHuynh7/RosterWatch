@@ -10,7 +10,7 @@ import json
 
 import pandas as pd
 
-from . import backtest, brief, data, signals, trend, warehouse
+from . import backtest, brief, data, quality, signals, trend, warehouse
 from .config import HISTORY, LIVE_SEASON as LIVE, MODELS, RESULTS as OUT, ROSTERSHIP_SNAPSHOTS
 
 
@@ -25,6 +25,7 @@ CASE_STUDIES = [(2025, "HOU", ["Nick Chubb", "Woody Marks"]),
 
 def main(threshold, cusum_h):
     usage = data.load_weekly_usage(HISTORY + [LIVE])
+    player_ids = data.load_player_ids(HISTORY + [LIVE])
 
     # 1. Calibrate noise + evaluate thresholds on past seasons
     hist = signals.build_windows(usage[usage.season < LIVE], with_future=True)
@@ -71,10 +72,21 @@ def main(threshold, cusum_h):
         flags = pd.concat([flags, slow], ignore_index=True)
     cus_live.round(3).to_csv(OUT / "cusum_current.csv", index=False)
 
-    # Sleeper: depth chart ("secure on paper"), injury status, 7-day add/drop counts
+    # Sleeper: depth chart ("secure on paper"), injury status, 7-day add/drop counts.
+    # Linked through player_ids.sleeper_id (most Sleeper players don't list a gsis id).
     sleeper = data.load_sleeper()
-    flags = flags.merge(sleeper.drop(columns="sleeper_name"), on="gsis_id", how="left") \
-        if "gsis_id" in flags else flags
+    if "pfr_player_id" in flags:
+        flags = flags.merge(player_ids[["pfr_player_id", "sleeper_id"]], on="pfr_player_id", how="left") \
+                     .merge(sleeper.drop(columns=["sleeper_name", "gsis_id", "espn_id"]),
+                            on="sleeper_id", how="left")
+
+    # ID check: does every player link to stats, ESPN and Sleeper?
+    report = quality.id_mapping_report(usage, player_ids, roster, sleeper, LIVE)
+    report.to_csv(OUT / "id_mapping_report.csv", index=False)
+    quality.unmatched_players(player_ids).to_csv(OUT / "id_unmatched.csv", index=False)
+    print("\nPlayer ID check:")
+    for _, r in report.iterrows():
+        print(f"  {r.share:7.1%}  {r.matched:>6} / {r.total:<6} {r.check}")
 
     cols = ["signal", "player", "position", "team", "as_of_week", "pct_rostered",
             "pct_rostered_change", "shift_score", "snap_pct_base", "snap_pct_recent",

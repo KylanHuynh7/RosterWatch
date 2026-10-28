@@ -2,11 +2,15 @@
 
 ## BigQuery (implemented: `src/warehouse.py`)
 
-The loader uploads 12 tables to one dataset, replacing each table on every run so re-running is always safe:
+The loader uploads 17 tables to one dataset, replacing each table on every run so re-running is always safe:
 
 | Table | What |
 |---|---|
 | `weekly_usage` | Every player-game 2022–present: snap, opportunity, passing-down, red-zone share |
+| `snap_counts` | Clean snap counts: regular season, RB/WR/TE, games with at least one offensive snap |
+| `pbp_plays` | Clean play-by-play: regular-season runs and passes, with quarter, score, win probability and passing-down / red-zone tags |
+| `player_ids` | One row per player: nflverse (gsis), ESPN, Sleeper and PFR ids, and how they were matched (`id_source`) |
+| `id_mapping_report`, `id_unmatched` | Match rates for each id, and the players matched only by name or not at all |
 | `signals_current` | This week's flags with reasons |
 | `shift_scores_current`, `cusum_current`, `usage_trends_current` | Scores and trends for the dashboard |
 | `backtest_*`, `case_studies`, `case_study_flags` | Methodology evidence |
@@ -51,6 +55,7 @@ Paste these into the BigQuery console (Query editor). Each was checked against t
 | `02_rolling_usage.sql` | Rolling 3-game average and standard deviation with `AVG() OVER (... ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)` |
 | `03_weekly_change_by_position.sql` | Typical game-to-game swing by position, using `LAG()` |
 | `04_this_weeks_flags.sql` | The current flag list |
+| `05_id_mapping_check.sql` | How each player was matched (PFR id, name, or unmatched) and which ids he has |
 
 ## Planned
 

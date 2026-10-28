@@ -25,11 +25,12 @@ A UC San Diego DS3 project, built on the DS3 project template. RosterWatch flags
 │   ├── __init__.py
 │   ├── example.py          # DS3 template example
 │   ├── config.py           # paths + settings (reads .env)
-│   ├── data.py             # nflverse, Sleeper and ESPN loaders
+│   ├── data.py             # nflverse, Sleeper and ESPN loaders; clean tables; player ID mapping
 │   ├── signals.py          # Phase 1: shift score + flag rules
 │   ├── trend.py            # Phase 2: CUSUM slow bleed / climb
 │   ├── backtest.py         # threshold evaluation on 2022-2025
 │   ├── warehouse.py        # uploads tables to BigQuery
+│   ├── quality.py          # player ID match checks
 │   ├── pipeline.py         # runs everything -> results/
 │   └── brief.py            # fills frontend/brief_template.html
 ├── frontend/
@@ -128,6 +129,7 @@ Backtest (`results/backtest_cusum.csv`): a first crossing of −3 is followed by
 ## Outputs in `results/`
 
 - `signals_current.csv`: this week's flags with reasons → the main dashboard table
+- `id_mapping_report.csv`, `id_unmatched.csv`: how well player ids link across nflverse, ESPN and Sleeper, and which players still need fixing
 - `shift_scores_current.csv`, `cusum_current.csv`: every player's scores
 - `usage_trends_current.csv`: player-game usage → line charts per player
 - `backtest_thresholds.csv`, `backtest_cusum.csv`, `backtest_fill_in.csv`, `case_studies.csv`: methodology evidence

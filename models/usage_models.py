@@ -34,11 +34,14 @@ def calculate_scores(df):
             total_weight = 0
 
             for metric, weight in METRICS.items():
+                if (
+                    baseline[metric].isna().any()
+                    or recent[metric].isna().any()
+                ):
+                    continue
+                
                 before = baseline[metric].mean()
                 after = recent[metric].mean()
-
-                if pd.isna(before) or pd.isna(after):
-                    continue
 
                 change = after - before
 

@@ -1,6 +1,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -23,7 +24,13 @@ DATA_DIR = ROOT / "data" / "processed"
 POSITIONS = ["RB", "WR", "TE"]
 WEEKS = list(range(1, 19))
 
-# Position-specific weights for the Volatility Model.
+METRICS = [
+    "snap_pct",
+    "opp_share",
+    "passdown_share",
+    "redzone_share",
+]
+
 POSITION_WEIGHTS = {
     "RB": {
         "snap_pct": 0.30,
@@ -45,7 +52,8 @@ POSITION_WEIGHTS = {
     },
 }
 
-# Stricter eligibility requirements for consistency rankings.
+# These are experimental minimum requirements for
+# the Most Consistent Players leaderboard.
 CONSISTENCY_THRESHOLDS = {
     "RB": {
         "min_weeks": 10,
@@ -64,6 +72,10 @@ CONSISTENCY_THRESHOLDS = {
     },
 }
 
+# Require enough valid week-to-week comparisons
+# before including a player in consistency rankings.
+MIN_WEEKLY_COMPARISONS = 8
+
 COLORS = {
     "blue": "#38BDF8",
     "green": "#4ADE80",
@@ -73,6 +85,27 @@ COLORS = {
     "text": "#E2E8F0",
 }
 
+WEEKLY_COLUMNS = [
+    "season",
+    "week",
+    "gsis_id",
+    "player_name",
+    "position",
+    "team",
+    "weekly_volatility",
+    "snap_change",
+    "opportunity_change",
+    "passdown_change",
+    "redzone_change",
+    "snap_pct",
+    "opp_share",
+    "passdown_share",
+    "redzone_share",
+    "targets",
+    "carries",
+    "opportunities",
+]
+
 SCORE_COLUMNS = [
     "season",
     "gsis_id",
@@ -80,11 +113,8 @@ SCORE_COLUMNS = [
     "position",
     "team",
     "weeks",
+    "weekly_comparisons",
     "volatility_score",
-    "snap_volatility",
-    "opportunity_volatility",
-    "passdown_volatility",
-    "redzone_volatility",
     "avg_snap_pct",
     "avg_opportunities_per_week",
     "consistency_eligible",
@@ -195,7 +225,7 @@ h1, h2, h3 {
 
 
 # ============================================================
-# 3. LOAD DATA
+# 3. LOAD AND VALIDATE DATA
 # ============================================================
 
 @st.cache_data(show_spinner="Loading RosterWatch data...")
@@ -264,9 +294,14 @@ def load_data():
         & usage["position"].isin(POSITIONS)
     ].copy()
 
+    usage = usage.dropna(
+        subset=["gsis_id", "player_name"]
+    )
+
     usage["season"] = usage["season"].astype(int)
     usage["week"] = usage["week"].astype(int)
 
+    # Remove exact duplicate rows.
     usage = usage.drop_duplicates()
 
     return usage
@@ -295,19 +330,21 @@ if usage.empty:
 
 
 # ============================================================
-# 4. VOLATILITY MODEL
+# 4. WEEK-TO-WEEK VOLATILITY MODEL
 # ============================================================
 
-@st.cache_data(show_spinner="Calculating volatility scores...")
+@st.cache_data(show_spinner="Calculating weekly volatility...")
 def calculate_volatility(data):
 
-    results = []
+    weekly_results = []
+    season_results = []
 
     for (season, player_id), player in data.groupby(
         ["season", "gsis_id"]
     ):
 
         player = player.sort_values("week")
+
         position = player["position"].iloc[-1]
 
         if position not in POSITION_WEIGHTS:
@@ -316,7 +353,9 @@ def calculate_volatility(data):
         weights = POSITION_WEIGHTS[position]
         thresholds = CONSISTENCY_THRESHOLDS[position]
 
-        # One observation per player-week.
+        # Create one observation per player-week.
+        # Use mean to avoid double-counting repeated
+        # player-week rows.
         weekly = (
             player.groupby("week")
             .agg({
@@ -327,43 +366,96 @@ def calculate_volatility(data):
                 "targets": "mean",
                 "carries": "mean",
             })
+            .sort_index()
         )
 
-        metric_volatility = {}
-
-        for metric in weights:
-
-            values = weekly[metric].dropna()
-
-            if len(values) < 2:
-                break
-
-            metric_volatility[metric] = (
-                values.std(ddof=0)
-            )
-
-        if len(metric_volatility) != len(weights):
-            continue
-
-        score = sum(
-            weights[metric] * metric_volatility[metric]
-            for metric in weights
-        )
-
-        recorded_weeks = len(weekly)
-        avg_snap_pct = weekly["snap_pct"].mean()
-
-        weekly_opportunities = (
+        weekly["opportunities"] = (
             weekly["targets"].fillna(0)
             + weekly["carries"].fillna(0)
         )
 
+        # Calculate absolute changes from the
+        # previous recorded week.
+        changes = weekly[METRICS].diff().abs()
+
+        # Only score consecutive calendar weeks.
+        # Example: Week 7 cannot be compared with
+        # Week 5 if Week 6 is missing.
+        consecutive = (
+            weekly.index.to_series().diff() == 1
+        )
+
+        changes.loc[~consecutive, :] = np.nan
+
+        # Position-specific weighted weekly volatility.
+        weekly["weekly_volatility"] = (
+            changes.mul(pd.Series(weights))
+            .sum(
+                axis=1,
+                min_count=len(METRICS),
+            )
+        )
+
+        weekly["snap_change"] = changes["snap_pct"]
+        weekly["opportunity_change"] = changes["opp_share"]
+        weekly["passdown_change"] = changes["passdown_share"]
+        weekly["redzone_change"] = changes["redzone_share"]
+
+        latest = player.iloc[-1]
+
+        # Store the score for every recorded week.
+        for week, row in weekly.iterrows():
+
+            weekly_results.append({
+                "season": season,
+                "week": int(week),
+                "gsis_id": player_id,
+                "player_name": latest["player_name"],
+                "position": position,
+                "team": latest["team"],
+                "weekly_volatility": row[
+                    "weekly_volatility"
+                ],
+                "snap_change": row["snap_change"],
+                "opportunity_change": row[
+                    "opportunity_change"
+                ],
+                "passdown_change": row[
+                    "passdown_change"
+                ],
+                "redzone_change": row[
+                    "redzone_change"
+                ],
+                "snap_pct": row["snap_pct"],
+                "opp_share": row["opp_share"],
+                "passdown_share": row["passdown_share"],
+                "redzone_share": row["redzone_share"],
+                "targets": row["targets"],
+                "carries": row["carries"],
+                "opportunities": row["opportunities"],
+            })
+
+        valid_scores = (
+            weekly["weekly_volatility"].dropna()
+        )
+
+        # A player needs at least one valid comparison
+        # to receive an average weekly volatility score.
+        if valid_scores.empty:
+            continue
+
+        recorded_weeks = len(weekly)
+        weekly_comparisons = len(valid_scores)
+
+        avg_snap_pct = weekly["snap_pct"].mean()
+
         avg_opportunities = (
-            weekly_opportunities.mean()
+            weekly["opportunities"].mean()
         )
 
         consistency_eligible = (
             recorded_weeks >= thresholds["min_weeks"]
+            and weekly_comparisons >= MIN_WEEKLY_COMPARISONS
             and pd.notna(avg_snap_pct)
             and avg_snap_pct >= thresholds["min_snap_pct"]
             and pd.notna(avg_opportunities)
@@ -371,28 +463,15 @@ def calculate_volatility(data):
             >= thresholds["min_opportunities_per_week"]
         )
 
-        latest = player.iloc[-1]
-
-        results.append({
+        season_results.append({
             "season": season,
             "gsis_id": player_id,
             "player_name": latest["player_name"],
             "position": position,
             "team": latest["team"],
             "weeks": recorded_weeks,
-            "volatility_score": score,
-            "snap_volatility": metric_volatility[
-                "snap_pct"
-            ],
-            "opportunity_volatility": metric_volatility[
-                "opp_share"
-            ],
-            "passdown_volatility": metric_volatility[
-                "passdown_share"
-            ],
-            "redzone_volatility": metric_volatility[
-                "redzone_share"
-            ],
+            "weekly_comparisons": weekly_comparisons,
+            "volatility_score": valid_scores.mean(),
             "avg_snap_pct": avg_snap_pct,
             "avg_opportunities_per_week": avg_opportunities,
             "consistency_eligible": bool(
@@ -400,13 +479,20 @@ def calculate_volatility(data):
             ),
         })
 
-    return pd.DataFrame(
-        results,
+    weekly_scores = pd.DataFrame(
+        weekly_results,
+        columns=WEEKLY_COLUMNS,
+    )
+
+    season_scores = pd.DataFrame(
+        season_results,
         columns=SCORE_COLUMNS,
     )
 
+    return weekly_scores, season_scores
 
-volatility = calculate_volatility(usage)
+
+weekly_volatility, volatility = calculate_volatility(usage)
 
 
 # ============================================================
@@ -420,8 +506,8 @@ def calculate_consistency_quality(data):
 
     scored = data.copy()
 
-    # Low volatility is better.
-    # High playing time and opportunities are better.
+    # Higher consistency = lower volatility.
+    # Higher playing time and opportunities = better.
 
     volatility_rank = scored[
         "volatility_score"
@@ -444,12 +530,6 @@ def calculate_consistency_quality(data):
         pct=True,
     )
 
-    # 50% consistency
-    # 25% snap participation
-    # 25% offensive opportunities
-    #
-    # Convert rankings to a 0–100 quality score.
-
     scored["consistency_quality_score"] = (
         0.50 * (1 - volatility_rank)
         + 0.25 * snap_rank
@@ -467,20 +547,20 @@ hero_html = """
 <div class="hero">
 <div class="hero-title">RosterWatch 🏈</div>
 <div class="hero-subtitle">
-NFL Player Volatility Analytics | 2022–2025
+NFL Weekly Volatility Analytics | 2022–2025
 </div>
 <div class="hero-description">
-Explore how consistently NFL players are involved in their
-team's offense. Compare playing time, offensive opportunities,
-passing-down involvement, and red-zone usage across the season.
+Track how NFL players' offensive roles change from week to week.
+Explore playing time, offensive opportunities, passing-down
+involvement, and red-zone usage with position-aware analytics.
 </div>
 <div class="pills">
-<span class="pill">Volatility Model</span>
+<span class="pill">Weekly Volatility Model</span>
 <span class="pill">Position-Aware Scoring</span>
 <span class="pill">Meaningful Usage Thresholds</span>
-<span class="pill">Consistency Quality Rankings</span>
 <span class="pill">2022–2025 Seasons</span>
 <span class="pill">RB / WR / TE</span>
+<span class="pill">Weeks 1–18</span>
 </div>
 </div>
 """
@@ -499,18 +579,17 @@ st.header("About RosterWatch")
 
 st.write(
     "RosterWatch is an interactive NFL analytics dashboard "
-    "that helps users understand how consistently players "
-    "are involved in their team's offense."
+    "that tracks how players' offensive involvement changes "
+    "from one week to the next. Rather than calculating "
+    "volatility using season-long standard deviation, "
+    "the model measures changes between consecutive weeks."
 )
 
 st.write(
-    "The Volatility Model adjusts its weights for RBs, "
-    "WRs, and TEs. To identify consistently involved "
-    "players rather than rarely used backups, the "
-    "Most Consistent Players leaderboard requires "
-    "minimum playing time and opportunities, then "
-    "combines stability and offensive involvement "
-    "into a Consistency Quality Score."
+    "The model uses position-specific weights for running "
+    "backs, wide receivers, and tight ends. Its consistency "
+    "rankings also account for meaningful playing time "
+    "and offensive opportunities."
 )
 
 
@@ -522,24 +601,37 @@ st.header("Our Analytics Model")
 
 with st.container(border=True):
 
-    st.subheader("Volatility Model")
+    st.subheader("Weekly Volatility Model")
 
     st.write(
-        "The Volatility Model measures how much a player's "
-        "offensive involvement varies throughout a season. "
-        "It calculates the standard deviation of four "
-        "usage metrics and combines them using weights "
-        "specific to the player's position."
+        "The Weekly Volatility Model measures how much a "
+        "player's offensive involvement changes compared "
+        "with the previous NFL week."
     )
 
-    st.markdown("#### General Volatility Equation")
+    st.markdown("#### Weekly Volatility Equation")
 
     st.latex(
-        r"V = w_S\sigma_S + w_O\sigma_O "
-        r"+ w_P\sigma_P + w_R\sigma_R"
+        r"V_t = w_S|S_t-S_{t-1}|"
+        r"+w_O|O_t-O_{t-1}|"
+        r"+w_P|P_t-P_{t-1}|"
+        r"+w_R|R_t-R_{t-1}|"
     )
 
-    st.markdown("#### Position-Specific Equations")
+    st.markdown("**Variables:**")
+
+    st.markdown(
+        """
+- **Vₜ:** Volatility score for the current week
+- **S:** Offensive snap percentage
+- **O:** Opportunity share
+- **P:** Passing-down share
+- **R:** Red-zone share
+- **w:** Position-specific weight
+"""
+    )
+
+    st.markdown("#### Position-Specific Weights")
 
     selected_formula_position = st.selectbox(
         "View Position Formula",
@@ -550,54 +642,74 @@ with st.container(border=True):
     if selected_formula_position == "RB":
 
         st.latex(
-            r"V_{RB} = 0.30\sigma_S + 0.45\sigma_O "
-            r"+ 0.15\sigma_P + 0.10\sigma_R"
+            r"V_{RB,t}=0.30|\Delta S_t|"
+            r"+0.45|\Delta O_t|"
+            r"+0.15|\Delta P_t|"
+            r"+0.10|\Delta R_t|"
         )
 
     elif selected_formula_position == "WR":
 
         st.latex(
-            r"V_{WR} = 0.35\sigma_S + 0.35\sigma_O "
-            r"+ 0.20\sigma_P + 0.10\sigma_R"
+            r"V_{WR,t}=0.35|\Delta S_t|"
+            r"+0.35|\Delta O_t|"
+            r"+0.20|\Delta P_t|"
+            r"+0.10|\Delta R_t|"
         )
 
     else:
 
         st.latex(
-            r"V_{TE} = 0.40\sigma_S + 0.30\sigma_O "
-            r"+ 0.20\sigma_P + 0.10\sigma_R"
+            r"V_{TE,t}=0.40|\Delta S_t|"
+            r"+0.30|\Delta O_t|"
+            r"+0.20|\Delta P_t|"
+            r"+0.10|\Delta R_t|"
         )
 
     st.divider()
+
+    st.markdown("#### Average Weekly Volatility")
+
+    st.write(
+        "To compare players across the season, "
+        "RosterWatch averages their valid weekly "
+        "volatility scores."
+    )
+
+    st.latex(
+        r"\bar{V}=\frac{1}{m}"
+        r"\sum_{t \in T} V_t"
+    )
+
+    st.caption(
+        "T contains weeks with valid consecutive-week "
+        "comparisons, and m is the number of those comparisons."
+    )
 
     left, right = st.columns(2)
 
     with left:
 
-        st.markdown("**Higher Volatility Score**")
+        st.markdown("**Higher Weekly Volatility**")
 
         st.write(
-            "Greater variation in offensive involvement."
+            "The player's offensive role changed "
+            "more significantly from the previous week."
         )
 
     with right:
 
-        st.markdown("**Lower Volatility Score**")
+        st.markdown("**Lower Weekly Volatility**")
 
         st.write(
-            "More stable offensive involvement."
+            "The player's offensive involvement "
+            "remained more similar to the previous week."
         )
 
-    st.info(
-        "Low volatility alone does not guarantee a "
-        "high consistency ranking. Players must also "
-        "receive meaningful playing time and opportunities."
-    )
 
+with st.expander("How are Weekly Volatility and Consistency calculated?"):
 
-with st.expander("How are Volatility and Consistency calculated?"):
-
-    st.markdown("#### Volatility Weights")
+    st.markdown("#### Model Weights")
 
     st.table(
         pd.DataFrame({
@@ -613,49 +725,46 @@ with st.expander("How are Volatility and Consistency calculated?"):
         })
     )
 
-    st.markdown("#### Standard Deviation")
-
-    st.latex(
-        r"\sigma_X = "
-        r"\sqrt{\frac{1}{n}"
-        r"\sum_{i=1}^{n}(X_i-\bar{X})^2}"
-    )
-
     st.markdown("#### Consistency Eligibility")
 
     st.table(
         pd.DataFrame({
             "Requirement": [
                 "Minimum Recorded Weeks",
+                "Minimum Valid Weekly Comparisons",
                 "Minimum Average Snap %",
                 "Minimum Carries + Targets / Week",
             ],
-            "RB": ["10", "50%", "10"],
-            "WR": ["10", "65%", "5"],
-            "TE": ["10", "60%", "4"],
+            "RB": ["10", "8", "50%", "10"],
+            "WR": ["10", "8", "65%", "5"],
+            "TE": ["10", "8", "60%", "4"],
         })
     )
 
     st.markdown("#### Consistency Quality Score")
 
     st.latex(
-        r"Q = 100\left("
-        r"0.50C + 0.25S + 0.25O"
-        r"\right)"
+        r"Q=100(0.50C+0.25S+0.25O)"
     )
 
     st.write(
-        "**C** represents the player's relative consistency "
-        "ranking, **S** represents their snap participation "
-        "ranking, and **O** represents their opportunity "
-        "ranking among eligible players at the same position."
+        "C rewards lower average weekly volatility, "
+        "S rewards higher snap participation, and "
+        "O rewards more offensive opportunities. "
+        "Each component is ranked relative to eligible "
+        "players at the same position."
+    )
+
+    st.info(
+        "Week 1 has no previous week for comparison. "
+        "A missing week also prevents a comparison "
+        "with the next recorded week. Missing data "
+        "is never treated as zero volatility."
     )
 
     st.caption(
-        "Higher quality scores indicate a stronger "
-        "combination of low volatility, meaningful "
-        "playing time, and offensive opportunities. "
-        "Weights and thresholds are experimental."
+        "Weights, thresholds, and quality-score "
+        "coefficients are experimental."
     )
 
 
@@ -683,11 +792,11 @@ position = st.sidebar.selectbox(
 st.sidebar.divider()
 
 st.sidebar.markdown("**Active Analytics Model**")
-st.sidebar.caption("Position-Aware Volatility Model")
+st.sidebar.caption("Weekly Volatility Model")
 
-st.sidebar.markdown("**Consistency Rankings**")
+st.sidebar.markdown("**Ranking Method**")
 st.sidebar.caption(
-    "Meaningful usage thresholds + Quality Score"
+    "Average weekly volatility + meaningful usage thresholds"
 )
 
 st.sidebar.markdown("**Data Coverage**")
@@ -708,6 +817,10 @@ filtered_volatility = volatility.loc[
     volatility["season"] == season
 ].copy()
 
+filtered_weekly = weekly_volatility.loc[
+    weekly_volatility["season"] == season
+].copy()
+
 if position != "All Positions":
 
     filtered_usage = filtered_usage.loc[
@@ -716,6 +829,10 @@ if position != "All Positions":
 
     filtered_volatility = filtered_volatility.loc[
         filtered_volatility["position"] == position
+    ]
+
+    filtered_weekly = filtered_weekly.loc[
+        filtered_weekly["position"] == position
     ]
 
 
@@ -762,7 +879,7 @@ st.header("🔎 Player Explorer")
 
 st.write(
     "Select a player to explore weekly offensive usage "
-    "and their position-adjusted Volatility Score."
+    "and their week-to-week volatility."
 )
 
 players = (
@@ -807,13 +924,21 @@ else:
         player_data["position"].iloc[-1]
     )
 
+    player_weekly = (
+        filtered_weekly.loc[
+            filtered_weekly["gsis_id"] == player_id
+        ]
+        .sort_values("week")
+        .copy()
+    )
+
+    player_summary = filtered_volatility.loc[
+        filtered_volatility["gsis_id"] == player_id
+    ]
+
     st.subheader(
         f"{player_name} — {season} Weekly Usage"
     )
-
-    player_volatility = filtered_volatility.loc[
-        filtered_volatility["gsis_id"] == player_id
-    ]
 
     m1, m2, m3, m4 = st.columns(4)
 
@@ -836,19 +961,19 @@ else:
         f"{player_data['carries'].sum():,.0f}",
     )
 
-    if not player_volatility.empty:
+    if not player_summary.empty:
 
-        player_score = player_volatility[
+        player_score = player_summary[
             "volatility_score"
         ].iloc[0]
 
         m4.metric(
-            "Volatility Score",
+            "Avg Weekly Volatility",
             f"{player_score:.3f}",
         )
 
         is_eligible = bool(
-            player_volatility[
+            player_summary[
                 "consistency_eligible"
             ].iloc[0]
         )
@@ -856,29 +981,28 @@ else:
         if is_eligible:
 
             st.success(
-                "This player meets the playing-time "
-                "and opportunity thresholds for "
-                "consistency rankings."
+                "This player meets the playing-time, "
+                "opportunity, and weekly comparison "
+                "requirements for consistency rankings."
             )
 
         else:
 
             st.caption(
-                "This player does not meet the "
-                "minimum consistency eligibility "
-                "thresholds."
+                "This player does not meet all "
+                "consistency leaderboard thresholds."
             )
 
     else:
 
         m4.metric(
-            "Volatility Score",
+            "Avg Weekly Volatility",
             "N/A",
         )
 
     st.caption(
-        f"Volatility uses the {player_position}-specific "
-        "model weights."
+        f"Weekly volatility uses {player_position}-specific "
+        "weights and compares consecutive NFL weeks."
     )
 
     controls1, controls2 = st.columns([2, 1])
@@ -1018,7 +1142,7 @@ else:
         return fig
 
     # --------------------------------------------------------
-    # FOUR PLAYER CHARTS
+    # FOUR PLAYER USAGE CHARTS
     # --------------------------------------------------------
 
     chart1, chart2 = st.columns(2)
@@ -1080,71 +1204,140 @@ else:
         )
 
     # --------------------------------------------------------
-    # HIGHLIGHTED WEEK SUMMARY
+    # WEEKLY VOLATILITY CHART
     # --------------------------------------------------------
 
-    week_values = (
-        player_data.groupby("week")[
-            [
-                "snap_pct",
-                "opp_share",
-                "targets",
-                "carries",
-            ]
-        ]
-        .mean()
+    st.subheader("Weekly Volatility")
+
+    st.write(
+        "This chart shows how much the player's offensive "
+        "usage changed compared with the previous week."
     )
 
-    if highlighted_week in week_values.index:
+    weekly_series = (
+        player_weekly
+        .set_index("week")["weekly_volatility"]
+        .reindex(WEEKS)
+    )
 
-        current = week_values.loc[
-            highlighted_week
+    volatility_fig = go.Figure()
+
+    volatility_fig.add_trace(
+        go.Bar(
+            x=WEEKS,
+            y=weekly_series.values,
+            marker_color=COLORS["blue"],
+            hovertemplate=(
+                "Week %{x}<br>"
+                "Weekly Volatility: %{y:.3f}"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    volatility_fig.add_vrect(
+        x0=highlighted_week - 0.45,
+        x1=highlighted_week + 0.45,
+        fillcolor="rgba(255,255,255,0.07)",
+        line_width=0,
+        layer="below",
+    )
+
+    volatility_fig.update_layout(
+        title="Week-to-Week Usage Volatility",
+        paper_bgcolor=COLORS["panel"],
+        plot_bgcolor=COLORS["panel"],
+        font=dict(color=COLORS["text"]),
+        height=400,
+        xaxis=dict(
+            title="NFL Week",
+            tickmode="array",
+            tickvals=WEEKS,
+            range=[0.5, 18.5],
+            gridcolor="#2A405A",
+        ),
+        yaxis=dict(
+            title="Weekly Volatility Score",
+            rangemode="tozero",
+            gridcolor="#2A405A",
+        ),
+        margin=dict(
+            l=55,
+            r=20,
+            t=65,
+            b=55,
+        ),
+    )
+
+    st.plotly_chart(
+        volatility_fig,
+        use_container_width=True,
+    )
+
+    # --------------------------------------------------------
+    # SELECTED WEEK DETAILS
+    # --------------------------------------------------------
+
+    selected_week_data = player_weekly.loc[
+        player_weekly["week"] == highlighted_week
+    ]
+
+    if not selected_week_data.empty:
+
+        selected_row = selected_week_data.iloc[0]
+
+        selected_score = selected_row[
+            "weekly_volatility"
         ]
 
-        def percent_text(value):
-            return (
-                f"{value:.1%}"
-                if pd.notna(value)
-                else "—"
+        if pd.notna(selected_score):
+
+            st.info(
+                f"Week {highlighted_week} volatility: "
+                f"{selected_score:.3f}"
             )
 
-        def number_text(value):
-            return (
-                f"{value:.1f}"
-                if pd.notna(value)
-                else "—"
-            )
+        else:
 
-        st.caption(
-            f"Week {highlighted_week}: "
-            f"Snap share "
-            f"{percent_text(current['snap_pct'])} · "
-            f"Opportunity share "
-            f"{percent_text(current['opp_share'])} · "
-            f"Targets "
-            f"{number_text(current['targets'])} · "
-            f"Carries "
-            f"{number_text(current['carries'])}"
-        )
+            st.caption(
+                f"Week {highlighted_week} has no valid "
+                "consecutive-week comparison."
+            )
 
     else:
 
         st.caption(
-            f"Week {highlighted_week}: "
-            "No recorded player data."
+            f"No player record for Week {highlighted_week}."
         )
 
     with st.expander("View Weekly Player Data"):
 
         st.dataframe(
-            player_data[
+            player_weekly[
                 [
                     "week",
-                    "team",
                     "snap_pct",
                     "opp_share",
                     "targets",
                     "carries",
+                    "weekly_volatility",
+                ]
+            ],
+            hide_index=True,
+            use_container_width=True,
+        )
+
+    with st.expander("View Weekly Volatility Components"):
+
+        st.dataframe(
+            player_weekly[
+                [
+                    "week",
+                    "snap_change",
+                    "opportunity_change",
+                    "passdown_change",
+                    "redzone_change",
+                    "weekly_volatility",
                 ]
             ],
             hide_index=True,
@@ -1161,10 +1354,9 @@ st.divider()
 st.header("📊 Player Volatility Rankings")
 
 st.write(
-    "Compare players based on offensive usage volatility. "
-    "The Most Consistent leaderboard prioritizes "
-    "players with both stable usage and meaningful "
-    "offensive involvement."
+    "Rankings use average week-to-week volatility. "
+    "The Most Consistent leaderboard also rewards "
+    "meaningful playing time and offensive opportunities."
 )
 
 ranking_position = st.selectbox(
@@ -1177,8 +1369,7 @@ ranking_position = st.selectbox(
     ),
     help=(
         "Compare players within the same position "
-        "because RB, WR, and TE scores use "
-        "different metric weights."
+        "because RB, WR, and TE use different weights."
     ),
 )
 
@@ -1206,10 +1397,12 @@ else:
         ranking_position
     ]
 
-    # Reapply thresholds directly to ensure that
-    # low-usage players cannot enter the leaderboard.
     eligible_players = ranked.loc[
         (ranked["weeks"] >= thresholds["min_weeks"])
+        & (
+            ranked["weekly_comparisons"]
+            >= MIN_WEEKLY_COMPARISONS
+        )
         & (
             ranked["avg_snap_pct"]
             >= thresholds["min_snap_pct"]
@@ -1220,8 +1413,6 @@ else:
         )
     ].copy()
 
-    # Calculate the quality score only among eligible
-    # players of the selected position and season.
     eligible_players = calculate_consistency_quality(
         eligible_players
     )
@@ -1238,12 +1429,12 @@ else:
     )
 
     r2.metric(
-        "Average Volatility",
+        "Avg Weekly Volatility",
         f"{average_volatility:.3f}",
     )
 
     r3.metric(
-        "Highest Volatility",
+        "Highest Avg Volatility",
         f"{ranked['volatility_score'].max():.3f}",
     )
 
@@ -1264,7 +1455,7 @@ else:
 
         st.caption(
             f"{ranking_position}s with the largest "
-            "offensive usage fluctuations."
+            "average week-to-week usage changes."
         )
 
         most_volatile = ranked.head(15).copy()
@@ -1279,6 +1470,7 @@ else:
                     "player_name",
                     "team",
                     "weeks",
+                    "weekly_comparisons",
                     "volatility_score",
                 ]
             ],
@@ -1288,7 +1480,8 @@ else:
                 "player_name": "Player",
                 "team": "Team",
                 "weeks": "Weeks",
-                "volatility_score": "Volatility",
+                "weekly_comparisons": "Comparisons",
+                "volatility_score": "Avg Volatility",
             },
         )
 
@@ -1301,9 +1494,8 @@ else:
         st.subheader("📉 Most Consistent Players")
 
         st.caption(
-            f"{ranking_position}s with stable offensive "
-            "usage, significant playing time, and "
-            "meaningful offensive opportunities."
+            f"{ranking_position}s with stable weekly usage "
+            "and substantial offensive involvement."
         )
 
         if eligible_players.empty:
@@ -1374,7 +1566,7 @@ else:
                     "weeks": "Weeks",
                     "avg_snap_pct": "Avg Snap %",
                     "avg_opportunities_per_week": "Opp / Week",
-                    "volatility_score": "Volatility",
+                    "volatility_score": "Avg Volatility",
                     "consistency_quality_score": "Quality Score",
                 },
             )
@@ -1382,18 +1574,17 @@ else:
         st.caption(
             f"Minimum requirements: "
             f"{thresholds['min_weeks']} recorded weeks, "
+            f"{MIN_WEEKLY_COMPARISONS} valid weekly comparisons, "
             f"{thresholds['min_snap_pct']:.0%} average snaps, "
             f"and {thresholds['min_opportunities_per_week']} "
             f"opportunities per week."
         )
 
     # --------------------------------------------------------
-    # DETAILED COMPONENTS
+    # DETAILED RANKINGS
     # --------------------------------------------------------
 
-    with st.expander(
-        "View Detailed Volatility Components"
-    ):
+    with st.expander("View Detailed Player Volatility Data"):
 
         detailed = ranked[
             [
@@ -1401,12 +1592,9 @@ else:
                 "position",
                 "team",
                 "weeks",
+                "weekly_comparisons",
                 "avg_snap_pct",
                 "avg_opportunities_per_week",
-                "snap_volatility",
-                "opportunity_volatility",
-                "passdown_volatility",
-                "redzone_volatility",
                 "volatility_score",
                 "consistency_eligible",
             ]
@@ -1415,10 +1603,6 @@ else:
         numeric_columns = [
             "avg_snap_pct",
             "avg_opportunities_per_week",
-            "snap_volatility",
-            "opportunity_volatility",
-            "passdown_volatility",
-            "redzone_volatility",
             "volatility_score",
         ]
 
@@ -1442,15 +1626,12 @@ st.divider()
 st.markdown("### RosterWatch 🏈")
 
 st.caption(
-    "NFL Volatility Analytics | 2022–2025 | RB · WR · TE"
+    "NFL Weekly Volatility Analytics | "
+    "2022–2025 | RB · WR · TE"
 )
 
 st.caption(
     "Built with Python, Pandas, Plotly, and Streamlit."
 )
 
-st.caption(
-    "Volatility measures historical usage variability. "
-    "Consistency Quality Score additionally considers "
-    "playing time and offensive opportunities."
-)
+

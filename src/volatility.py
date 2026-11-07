@@ -1,17 +1,23 @@
 """Week-to-week usage volatility model for RosterWatch.
 
 Each player-week is scored by how much the player's usage changed since
-his previous game. Every change is divided by the typical weekly change
-for that metric and position, so a score of 1.0 means a normal week and
-2.0 means twice the usual swing. Because of that scaling, each metric's
-share of the score matches its weight.
+his previous game:
+
+    V = 0.70 * snap score + 0.30 * opportunity score
+    score = this week's change / the position's typical weekly change
+
+Snap share change is measured in percentage points. Opportunity share
+change is measured relative to the player's own share (see
+RELATIVE_METRICS). Dividing each change by the typical weekly change
+for the position makes a score of 1.0 a normal week and 2.0 twice the
+usual swing, and makes each metric's share of the score match its
+weight: the two changes come in different sizes, so without it the
+weights wouldn't mean 70/30.
 
 All weights and thresholds live at the top of this module so the
 Streamlit app, tests and notebooks share one set of values. The reason
 for each number is noted next to it.
 """
-
-from math import ceil
 
 import numpy as np
 import pandas as pd
@@ -31,22 +37,33 @@ METRICS = [
 # weights are rescaled, instead of dropping the week.
 REQUIRED_METRICS = ["snap_pct"]
 
-# Share of the weekly score each metric controls: snap share only.
-# Tuned on 2022-24 and checked on 2025, a player's average volatility
-# so far best warned of a role change in his next 3 games when built
-# from snap share alone (AUC 0.63 / 0.57). Every blend tested did
-# worse, and more weight on the other metrics lowered it further (the
-# previous weights: 0.55 / 0.53). The other metrics' changes are still
-# calculated and shown; give them weight here to blend them in.
+# Share of the weekly score each metric controls (weights sum to 1).
+# Snap share is the strongest single warning of a coming role change.
+# Opportunity share, measured relative to the player's own share, adds
+# information snap share misses: it warns better of lost touches and
+# tracks how bumpy a player's fantasy points are (see the guide for
+# the 2022-24 / 2025 checks). Passing-down share added nothing on top,
+# and red-zone share is 0 in most games, so both are shown but not
+# weighted.
 POSITION_WEIGHTS = {
     position: {
-        "snap_pct": 1.0,
-        "opp_share": 0.0,
+        "snap_pct": 0.70,
+        "opp_share": 0.30,
         "passdown_share": 0.0,
         "redzone_share": 0.0,
     }
     for position in POSITIONS
 }
+
+# Metrics whose change is measured relative to the player's own level:
+# |change| / average of the two games. A raw change in opportunity
+# share mostly measures workload size (a 25% target share swings more
+# points than a 3% one), which made workhorses look volatile.
+RELATIVE_METRICS = ["opp_share"]
+
+# Smallest average share a relative change is divided by, so a player
+# going from 0% to 1% doesn't count as a 200% swing.
+RELATIVE_FLOOR = 0.05
 
 # Seasons used to measure each position's typical weekly change.
 # 2025 is left out so it can be used to check the model.
@@ -57,46 +74,65 @@ BASELINE_SEASONS = (2022, 2023, 2024)
 # player-games but score 4% of PPR fantasy points.
 MIN_ROLE_SNAP_PCT = 0.20
 
-# Players need this many scored weeks to appear in the volatility
-# rankings. With fewer, the average is mostly one game (in 2025 the
-# top WR on the unfiltered list had played 2 games). Matches the
-# 4-game window used elsewhere in the project.
-MIN_RANKED_COMPARISONS = 4
+# Share of his team's games in the selected weeks a player must have
+# played to be ranked (a bye isn't a missed game). A share instead of a
+# fixed count works the same for any week range, and a bye inside a
+# short range no longer knocks players out.
+#
+# Most Volatile: 25%, about 5 of 17 games for a full season, close to
+# the old 4 scored weeks. Keeps players whose role changed partway
+# through the season.
+MIN_RANKED_GAMES_SHARE = 0.25
 
-# One game's change in any metric counts at most 40 percentage points,
-# so a single injury exit can't dominate an average built on a few
-# games. About 4% of snap-share changes are larger. Full-season results
-# barely move with or without it (role-change AUC 0.630 either way).
+# Most Consistent: 55%, the old 10 of 17 games for a full season, and
+# 3 of 4 games for a 4-week range. 65% would also work for short ranges
+# but needs 12 of 17 games, which in 2025 dropped Bucky Irving (the
+# number 2 RB), George Kittle and Alvin Kamara.
+MIN_GAMES_SHARE = 0.55
+
+# One game's change in a percentage-point metric counts at most 40
+# points, so a single injury exit can't dominate an average built on a
+# few games. About 4% of snap-share changes are larger. Full-season
+# results barely move with or without it. Relative changes are already
+# limited to 200% (going to or from zero).
 MAX_WEEKLY_CHANGE = 0.40
 
-# Minimum usage for the Most Consistent leaderboard. "min_weeks" is the
-# full-season requirement; see eligibility_minimums for earlier weeks.
+# Minimum usage for the Most Consistent leaderboard, averaged over the
+# games played in the selected weeks (so neither depends on how many
+# weeks are selected).
 CONSISTENCY_THRESHOLDS = {
     "RB": {
-        "min_weeks": 10,
         "min_snap_pct": 0.50,
         "min_opportunities_per_week": 10,
     },
     "WR": {
-        "min_weeks": 10,
         "min_snap_pct": 0.65,
         "min_opportunities_per_week": 5,
     },
     "TE": {
-        "min_weeks": 10,
         "min_snap_pct": 0.60,
         "min_opportunities_per_week": 4,
     },
 }
 
-# Before a season is far enough along for 10 games, require 60% of the
-# weeks played so far, and never fewer than 3 games.
-MIN_WEEKS_SHARE = 0.60
-MIN_WEEKS_FLOOR = 3
+# Most Consistent leaderboard score (0-100):
+#     Q = 0.50 * steadiness + 0.25 * snaps + 0.25 * touches
+# where each part is the player's percentile (0-100) among the eligible
+# players at his position. Half rewards low volatility; the rest
+# rewards a large role, so a steady backup doesn't outrank a steady
+# starter.
+QUALITY_WEIGHTS = {
+    "low_volatility": 0.50,
+    "snap_pct": 0.25,
+    "opportunities": 0.25,
+}
 
-# Valid weekly comparisons required = minimum weeks minus 2 (the first
-# game has nothing to compare with, and one missed game is allowed).
-COMPARISON_GAP = 2
+# Percentile column for each part of the quality score.
+QUALITY_COLUMNS = {
+    "low_volatility": "steadiness_pctl",
+    "snap_pct": "snap_pctl",
+    "opportunities": "opportunity_pctl",
+}
 
 PLAYER_SEASON = ["season", "gsis_id"]
 
@@ -107,15 +143,26 @@ CHANGE_COLUMNS = {
     "redzone_share": "redzone_change",
 }
 
+# Each metric's part of the weekly score; the parts add up to it.
+PART_COLUMNS = {
+    "snap_pct": "snap_part",
+    "opp_share": "opportunity_part",
+    "passdown_share": "passdown_part",
+    "redzone_share": "redzone_part",
+}
+
 WEEKLY_COLUMNS = [
     "season",
     "week",
+    "previous_week",
     "gsis_id",
     "player_name",
     "position",
     "team",
+    "game_team",
     "weekly_volatility",
     *CHANGE_COLUMNS.values(),
+    *PART_COLUMNS.values(),
     *METRICS,
     "targets",
     "carries",
@@ -129,29 +176,15 @@ SCORE_COLUMNS = [
     "position",
     "team",
     "weeks",
+    "team_games",
+    "games_share",
     "weekly_comparisons",
     "volatility_score",
     "avg_snap_pct",
     "avg_opportunities_per_week",
+    "volatility_ranked",
     "consistency_eligible",
 ]
-
-
-def eligibility_minimums(position, weeks_so_far):
-    """Return the games and comparisons a player needs to be ranked.
-
-    Args:
-        position: "RB", "WR" or "TE".
-        weeks_so_far: last NFL week included in the data for the season.
-
-    Returns:
-        (min_weeks, min_comparisons). Through Week 18 this is the
-        full-season requirement (10 and 8).
-    """
-    full_season = CONSISTENCY_THRESHOLDS[position]["min_weeks"]
-    scaled = ceil(MIN_WEEKS_SHARE * weeks_so_far)
-    min_weeks = min(full_season, max(MIN_WEEKS_FLOOR, scaled))
-    return min_weeks, max(1, min_weeks - COMPARISON_GAP)
 
 
 def weekly_changes(data):
@@ -159,7 +192,10 @@ def weekly_changes(data):
 
     A change is measured only when the player didn't miss one of his
     team's games in between: a bye week doesn't break the comparison,
-    a missed game does. Each change is capped at MAX_WEEKLY_CHANGE.
+    a missed game does. Changes are in share units (0.12 = 12
+    percentage points) and capped at MAX_WEEKLY_CHANGE, except for
+    RELATIVE_METRICS, where the change is divided by the average of the
+    two games (0.40 = 40% of the player's share).
 
     Args:
         data: one row per player-game, with season, week, gsis_id,
@@ -167,10 +203,12 @@ def weekly_changes(data):
 
     Returns:
         One row per player-week with the usage columns, "opportunities"
-        (targets + carries) and one change column per metric (see
-        CHANGE_COLUMNS). Changes are NaN when there is no comparable
-        previous game. Player name, position and team are the player's
-        last values that season.
+        (targets + carries), "previous_week" (the game each change is
+        measured from) and one change column per metric (see
+        CHANGE_COLUMNS). Changes and previous_week are NaN when there is
+        no comparable previous game. Player name, position and team are
+        the player's last values that season; "game_team" is the team
+        he played for that week.
     """
     weekly = (
         data.sort_values(PLAYER_SEASON + ["week"])
@@ -209,13 +247,18 @@ def weekly_changes(data):
         previous_game >= weekly["team_previous_game"]
     )
 
-    changes = (
-        players[METRICS].diff().abs().clip(upper=MAX_WEEKLY_CHANGE)
-    )
+    differences = players[METRICS].diff().abs()
+    changes = differences.clip(upper=MAX_WEEKLY_CHANGE)
+    for metric in RELATIVE_METRICS:
+        average = (weekly[metric] + players[metric].shift()) / 2
+        changes[metric] = (
+            differences[metric] / average.clip(lower=RELATIVE_FLOOR)
+        )
     changes = changes.where(comparable)
 
     for metric, column in CHANGE_COLUMNS.items():
         weekly[column] = changes[metric]
+    weekly["previous_week"] = previous_game.where(comparable)
 
     weekly["opportunities"] = (
         weekly["targets"].fillna(0) + weekly["carries"].fillna(0)
@@ -224,7 +267,7 @@ def weekly_changes(data):
         weekly[column] = players[column].transform("last")
     weekly["team"] = players["game_team"].transform("last")
 
-    return weekly.drop(columns=["game_team", "team_previous_game"])
+    return weekly.drop(columns=["team_previous_game"])
 
 
 def typical_weekly_change(changes, seasons=BASELINE_SEASONS):
@@ -239,8 +282,8 @@ def typical_weekly_change(changes, seasons=BASELINE_SEASONS):
 
     Returns:
         DataFrame indexed by position with one column per metric, in
-        share units (0.12 = 12 percentage points). A metric that never
-        changed is NaN, so score_weeks skips it.
+        the units of weekly_changes. A metric that never changed is
+        NaN, so score_weeks skips it.
 
     Raises:
         ValueError: if a position has no typical change for one of
@@ -270,7 +313,7 @@ def typical_weekly_change(changes, seasons=BASELINE_SEASONS):
 
 
 def score_weeks(changes, typical, weights=POSITION_WEIGHTS):
-    """Add a "weekly_volatility" column to the output of weekly_changes.
+    """Score each week: a weighted average of the scaled changes.
 
     Each change is divided by the typical change for that metric and
     position, then combined with the position's weights. Weights are
@@ -283,7 +326,8 @@ def score_weeks(changes, typical, weights=POSITION_WEIGHTS):
 
     Returns:
         A copy of changes with "weekly_volatility" (1.0 = a typical
-        week; NaN when a required change is missing).
+        week; NaN when a required change is missing) and each metric's
+        part of it (PART_COLUMNS), which add up to the weekly score.
     """
     scored = changes.copy()
     change_columns = [CHANGE_COLUMNS[m] for m in METRICS]
@@ -306,23 +350,49 @@ def score_weeks(changes, typical, weights=POSITION_WEIGHTS):
 
     with np.errstate(invalid="ignore", divide="ignore"):
         score = weighted_sum / weight_used
+        parts = relative * metric_weights / weight_used[:, None]
     scored["weekly_volatility"] = np.where(has_required, score, np.nan)
+    parts[~has_required] = np.nan
+    for index, metric in enumerate(METRICS):
+        scored[PART_COLUMNS[metric]] = parts[:, index]
 
     return scored
 
 
-def season_scores(weekly):
+def season_scores(weekly, first_week=1, last_week=None):
     """Average weekly volatility and leaderboard eligibility per season.
 
     Args:
         weekly: output of score_weeks.
+        first_week: first NFL week of the window.
+        last_week: last NFL week of the window; None runs to the end of
+            each season. Only games inside the window count, and only
+            changes between two games inside it: Weeks 2-3 is the
+            change from Week 2 to Week 3.
 
     Returns:
-        One row per player-season with at least one scored week, with
-        the columns in SCORE_COLUMNS. "consistency_eligible" applies
-        CONSISTENCY_THRESHOLDS and eligibility_minimums.
+        One row per player-season with at least one scored week in the
+        window, with the columns in SCORE_COLUMNS:
+        "team_games" is the number of games his team (his last team that
+        season) played in the window and "games_share" the share of
+        them he played. "volatility_ranked" marks players in the
+        volatility rankings (MIN_ROLE_SNAP_PCT and
+        MIN_RANKED_GAMES_SHARE); "consistency_eligible" marks ranked
+        players who also meet MIN_GAMES_SHARE and
+        CONSISTENCY_THRESHOLDS.
     """
-    valid = weekly.dropna(subset=["weekly_volatility"])
+    season_end = weekly.groupby("season")["week"].max()
+    if last_week is not None:
+        season_end = season_end.clip(upper=last_week)
+
+    weekly = weekly.loc[
+        (weekly["week"] >= first_week)
+        & (weekly["week"] <= weekly["season"].map(season_end))
+    ]
+    valid = weekly.loc[
+        weekly["weekly_volatility"].notna()
+        & (weekly["previous_week"] >= first_week)
+    ]
     if valid.empty:
         return pd.DataFrame(columns=SCORE_COLUMNS)
 
@@ -342,22 +412,30 @@ def season_scores(weekly):
         seasons["weekly_comparisons"].astype(int)
     )
 
-    weeks_so_far = seasons["season"].map(
-        weekly.groupby("season")["week"].max()
+    # Games each team played in the window, from every player who
+    # played them, so a bye week doesn't count as a missed game.
+    team_games = (
+        weekly[["season", "game_team", "week"]]
+        .drop_duplicates()
+        .groupby(["season", "game_team"])
+        .size()
     )
-    minimums = [
-        eligibility_minimums(position, last_week)
-        for position, last_week in zip(seasons["position"], weeks_so_far)
-    ]
-    min_weeks = np.array([m[0] for m in minimums])
-    min_comparisons = np.array([m[1] for m in minimums])
+    seasons["team_games"] = pd.MultiIndex.from_frame(
+        seasons[["season", "team"]]
+    ).map(team_games.get).astype(float)
+    seasons["games_share"] = seasons["weeks"] / seasons["team_games"]
+
+    seasons["volatility_ranked"] = (
+        (seasons["avg_snap_pct"] >= MIN_ROLE_SNAP_PCT)
+        & (seasons["games_share"] >= MIN_RANKED_GAMES_SHARE)
+    )
 
     thresholds = pd.DataFrame(CONSISTENCY_THRESHOLDS).T.loc[
         seasons["position"]
     ]
     seasons["consistency_eligible"] = (
-        (seasons["weeks"].to_numpy() >= min_weeks)
-        & (seasons["weekly_comparisons"].to_numpy() >= min_comparisons)
+        seasons["volatility_ranked"].to_numpy()
+        & (seasons["games_share"].to_numpy() >= MIN_GAMES_SHARE)
         & (
             seasons["avg_snap_pct"].to_numpy()
             >= thresholds["min_snap_pct"].to_numpy()
@@ -369,6 +447,39 @@ def season_scores(weekly):
     )
 
     return seasons[SCORE_COLUMNS]
+
+
+def consistency_quality(players):
+    """Quality score for the Most Consistent leaderboard.
+
+    Args:
+        players: rows of season_scores to compare with each other,
+            usually the consistency-eligible players at one position.
+
+    Returns:
+        A copy with each player's percentile (0-100) among these
+        players for low volatility, average snap share, and carries +
+        targets per game (see QUALITY_COLUMNS), and "quality_score",
+        their weighted sum using QUALITY_WEIGHTS. The steadiest player
+        and the player with the most snaps or touches each get 100.
+    """
+    scored = players.copy()
+    percentiles = {
+        "low_volatility": scored["volatility_score"].rank(
+            ascending=False, pct=True
+        ),
+        "snap_pct": scored["avg_snap_pct"].rank(pct=True),
+        "opportunities": scored["avg_opportunities_per_week"].rank(
+            pct=True
+        ),
+    }
+
+    scored["quality_score"] = 0.0
+    for part, column in QUALITY_COLUMNS.items():
+        scored[column] = percentiles[part] * 100
+        scored["quality_score"] += QUALITY_WEIGHTS[part] * scored[column]
+
+    return scored
 
 
 def calculate_volatility(

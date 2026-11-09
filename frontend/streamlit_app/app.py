@@ -12,8 +12,8 @@ import streamlit as st
 # ============================================================
 
 st.set_page_config(
-    page_title="RosterWatch | NFL Volatility Analytics",
-    page_icon=":material/sports_football:",
+    page_title="RosterWatch 🏈 | NFL Volatility Analytics",
+    page_icon="🏈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -81,35 +81,29 @@ QUALITY_LABELS = {
     "opportunities": "Touches",
 }
 
-# Dark palette from the UI/UX Pro Max skill ("Financial Dashboard").
-# .streamlit/config.toml gives Streamlit's own widgets the same colors.
+# Blue-gradient palette; the CSS below uses the same colors.
 THEME = {
-    "background": "#020617",
-    "card": "#0E1223",
-    "muted": "#1A1E2F",
-    "border": "#334155",
-    "grid": "#1E293B",
-    "text": "#F8FAFC",
-    "muted_text": "#94A3B8",
-    "accent": "#22C55E",
+    "card": "#13243B",
+    "muted": "#152841",
+    "border": "#2B4967",
+    "grid": "#2A405A",
+    "text": "#E2E8F0",
+    "muted_text": "#A7BFD7",
+    "accent": "#38BDF8",
 }
 
-# Blue and amber stay distinguishable for color-blind readers; each
-# metric keeps its color on every chart.
+# Each metric keeps its color on every chart.
 METRIC_COLORS = {
     "snap_pct": "#38BDF8",
-    "opp_share": "#F59E0B",
-    "passdown_share": "#A78BFA",
-    "redzone_share": "#F472B6",
+    "opp_share": "#4ADE80",
+    "passdown_share": "#F59E0B",
+    "redzone_share": "#A78BFA",
 }
 
 COUNT_COLORS = {
-    "targets": "#2DD4BF",
+    "targets": "#F59E0B",
     "carries": "#A78BFA",
 }
-
-FONT = "Fira Sans, sans-serif"
-NUMBER_FONT = "Fira Code, monospace"
 
 # Shares are stored as 0-1 and shown as percentages. Volatility is shown
 # as a % of a normal week (1.0 = 100%), and weekly changes with a sign.
@@ -125,93 +119,89 @@ CHANGE_FORMAT = "%+.1f%%"
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap');
-
-:root {
-    --rw-card: #0E1223;
-    --rw-muted: #1A1E2F;
-    --rw-border: #334155;
-    --rw-text: #F8FAFC;
-    --rw-muted-text: #94A3B8;
-    --rw-accent: #22C55E;
-}
-
 .stApp {
-    background: #020617;
-    color: var(--rw-text);
+    background: radial-gradient(
+        circle at top right,
+        #17375b 0%,
+        #08111f 48%
+    );
+    color: #e2e8f0;
 }
 
 .block-container {
-    max-width: 1400px;
-    padding-top: 1.5rem;
+    max-width: 1450px;
+    padding-top: 2rem;
     padding-bottom: 3rem;
 }
 
 h1, h2, h3 {
-    color: var(--rw-text) !important;
-    letter-spacing: -0.01em;
+    color: #f8fafc !important;
 }
 
-[data-testid="stCaptionContainer"] {
-    color: var(--rw-muted-text);
+[data-testid="stSidebar"] {
+    background: #101e32;
 }
 
 [data-testid="stMetric"] {
-    background: var(--rw-card);
-    border: 1px solid var(--rw-border);
-    border-radius: 8px;
-    padding: 12px 16px;
-    transition: border-color .15s ease;
+    background: #152841;
+    border: 1px solid #2b4967;
+    border-radius: 14px;
+    padding: 18px;
+    transition: transform .18s ease, border-color .18s ease;
 }
 
 [data-testid="stMetric"]:hover {
-    border-color: #475569;
-}
-
-[data-testid="stMetricLabel"] {
-    color: var(--rw-muted-text);
+    transform: translateY(-2px);
+    border-color: #38bdf8;
 }
 
 [data-testid="stMetricValue"] {
-    color: var(--rw-text);
-    font-family: "Fira Code", monospace;
-    font-variant-numeric: tabular-nums;
-    font-size: 1.75rem;
+    color: #4ade80;
 }
 
 .hero {
-    border: 1px solid var(--rw-border);
-    border-left: 3px solid var(--rw-accent);
-    border-radius: 8px;
-    padding: 20px 24px;
-    background: var(--rw-card);
-    margin-bottom: 8px;
-}
-
-.hero-eyebrow {
-    color: var(--rw-muted-text);
-    font-size: .8rem;
-    letter-spacing: .06em;
-    text-transform: uppercase;
+    border: 1px solid #2b4967;
+    border-radius: 18px;
+    padding: 28px 32px;
+    background: linear-gradient(115deg, #10243b, #15395b);
+    margin-bottom: 24px;
 }
 
 .hero-title {
-    font-family: "Fira Code", monospace;
-    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
-    font-weight: 600;
-    color: var(--rw-text);
-    margin: 4px 0 8px;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -.04em;
+    color: #f8fafc;
+}
+
+.hero-subtitle {
+    color: #a7bfd7;
+    margin: 8px 0 16px;
 }
 
 .hero-description {
-    color: #CBD5E1;
-    line-height: 1.6;
-    max-width: 860px;
+    line-height: 1.7;
+    max-width: 850px;
 }
 
-:focus-visible {
-    outline: 2px solid var(--rw-accent) !important;
-    outline-offset: 2px;
+.pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.pill {
+    border: 1px solid #315779;
+    background: #173655;
+    border-radius: 999px;
+    padding: 7px 12px;
+    color: #c8e9ff;
+    font-size: .8rem;
+}
+
+.pill:hover {
+    background: #23537c;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -543,14 +533,14 @@ def style_figure(fig, height):
     fig.update_layout(
         paper_bgcolor=THEME["card"],
         plot_bgcolor=THEME["card"],
-        font=dict(family=FONT, color=THEME["text"], size=13),
+        font=dict(color=THEME["text"], size=13),
         title_font=dict(size=16),
         height=height,
         margin=dict(l=55, r=20, t=60, b=50),
         hoverlabel=dict(
             bgcolor=THEME["muted"],
             bordercolor=THEME["border"],
-            font=dict(family=NUMBER_FONT, color=THEME["text"]),
+            font=dict(color=THEME["text"]),
         ),
         xaxis=dict(
             title="NFL Week",
@@ -598,7 +588,7 @@ def label_week(fig, week, value, text, top, marker=True):
         xanchor = "center"
 
     box = dict(
-        font=dict(family=NUMBER_FONT, size=12, color=THEME["text"]),
+        font=dict(size=12, color=THEME["text"]),
         bgcolor=THEME["muted"],
         bordercolor=THEME["muted_text"],
         borderpad=4,
@@ -653,12 +643,22 @@ def label_week(fig, week, value, text, top, marker=True):
 
 hero_html = """
 <div class="hero">
-<div class="hero-eyebrow">NFL usage analytics · 2022–2025 · RB / WR / TE · Weeks 1–18</div>
-<div class="hero-title">RosterWatch</div>
+<div class="hero-title">RosterWatch 🏈</div>
+<div class="hero-subtitle">
+NFL Weekly Volatility Analytics | 2022–2025
+</div>
 <div class="hero-description">
-How much does each player's role change from one game to the next?
-RosterWatch compares every game with the player's previous game, so
-steady roles stand out from shaky ones.
+Track how NFL players' offensive roles change from week to week.
+Explore playing time, offensive opportunities, passing-down
+involvement, and red-zone usage with position-aware analytics.
+</div>
+<div class="pills">
+<span class="pill">Weekly Volatility Model</span>
+<span class="pill">Position-Aware Scoring</span>
+<span class="pill">Meaningful Usage Thresholds</span>
+<span class="pill">2022–2025 Seasons</span>
+<span class="pill">RB / WR / TE</span>
+<span class="pill">Weeks 1–18</span>
 </div>
 </div>
 """
@@ -673,7 +673,7 @@ st.markdown(
 # 7. ABOUT ROSTERWATCH
 # ============================================================
 
-st.header(":material/info: About RosterWatch")
+st.header("About RosterWatch")
 
 st.write(
     "RosterWatch is an interactive NFL analytics dashboard that tracks "
@@ -694,7 +694,6 @@ st.write(
 
 with st.expander(
     "How the Weekly Volatility Model works: the equation and its weights",
-    icon=":material/calculate:",
 ):
 
     st.markdown("#### Weekly Volatility Equation")
@@ -874,7 +873,6 @@ with st.expander(
 
 with st.expander(
     "How players are ranked: thresholds and the quality score",
-    icon=":material/leaderboard:",
 ):
 
     st.markdown("#### All Metrics")
@@ -970,7 +968,7 @@ with st.expander(
 # 8. SIDEBAR
 # ============================================================
 
-st.sidebar.title(":material/tune: Control Center")
+st.sidebar.title("Control Center")
 
 season_options = sorted(
     usage["season"].unique().tolist(),
@@ -1096,7 +1094,7 @@ def shade_selected_weeks(fig):
     fig.add_vrect(
         x0=first_week - 0.5,
         x1=last_week + 0.5,
-        fillcolor="rgba(148,163,184,0.10)",
+        fillcolor="rgba(56,189,248,0.10)",
         line_width=0,
         layer="below",
     )
@@ -1107,7 +1105,7 @@ def mark_highlighted_week(fig):
     fig.add_vrect(
         x0=highlighted_week - 0.45,
         x1=highlighted_week + 0.45,
-        fillcolor="rgba(248,250,252,0.06)",
+        fillcolor="rgba(255,255,255,0.07)",
         line=dict(color=THEME["muted_text"], width=1, dash="dot"),
         layer="below",
     )
@@ -1119,7 +1117,7 @@ def mark_highlighted_week(fig):
 
 st.divider()
 
-st.header(":material/monitoring: Season Overview")
+st.header("📊 Season Overview")
 
 st.caption(f"{season} NFL Season · {range_label} · {position}")
 
@@ -1152,7 +1150,7 @@ d.metric(
 
 st.divider()
 
-st.header(":material/person_search: Player Explorer")
+st.header("🔎 Player Explorer")
 
 st.write(
     "Select a player to explore weekly offensive usage "
@@ -2014,7 +2012,7 @@ else:
 
 st.divider()
 
-st.header(":material/leaderboard: Player Volatility Rankings")
+st.header("📊 Player Volatility Rankings")
 
 st.write(
     "Rankings use average week-to-week volatility (100% = a normal "
@@ -2107,7 +2105,7 @@ else:
 
     with ranking_left:
 
-        st.subheader(":material/swap_vert: Most Volatile")
+        st.subheader("📈 Most Volatile Players")
 
         role_floor = round(MIN_ROLE_SNAP_PCT * 100)
 
@@ -2197,7 +2195,7 @@ else:
 
     with ranking_right:
 
-        st.subheader(":material/trending_flat: Most Consistent")
+        st.subheader("📉 Most Consistent Players")
 
         position_floor = round(thresholds["min_snap_pct"] * 100)
 
@@ -2305,6 +2303,7 @@ else:
                                 max_value=100,
                                 format="%.0f",
                                 width=110,
+                                color="#4ADE80",
                                 help=(
                                     "Percentile among the "
                                     f"{len(eligible_players)} eligible "
@@ -2342,74 +2341,6 @@ else:
             "targets per game."
         )
 
-    # --------------------------------------------------------
-    # DETAILED RANKINGS
-    # --------------------------------------------------------
-
-    with st.expander("View Detailed Player Volatility Data"):
-
-        detailed = ranked[
-            [
-                "gsis_id",
-                "player_name",
-                "position",
-                "team",
-                "weeks",
-                "team_games",
-                "games_share",
-                "weekly_comparisons",
-                "avg_snap_pct",
-                "avg_opportunities_per_week",
-                "volatility_score",
-                "consistency_eligible",
-            ]
-        ].merge(
-            eligible_players[["gsis_id", "quality_score"]],
-            on="gsis_id",
-            how="left",
-        ).drop(columns="gsis_id")
-
-        for column in ["games_share", "avg_snap_pct", "volatility_score"]:
-            detailed[column] = detailed[column] * 100
-
-        st.dataframe(
-            detailed,
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "player_name": "Player",
-                "position": "Position",
-                "team": "Team",
-                "weeks": st.column_config.NumberColumn(
-                    "Games", format="%d"
-                ),
-                "team_games": st.column_config.NumberColumn(
-                    "Team Games", format="%d"
-                ),
-                "games_share": games_column,
-                "weekly_comparisons": st.column_config.NumberColumn(
-                    "Scored Weeks", format="%d"
-                ),
-                "avg_snap_pct": st.column_config.NumberColumn(
-                    "Avg Snap %", format=PERCENT_FORMAT
-                ),
-                "avg_opportunities_per_week": (
-                    st.column_config.NumberColumn(
-                        "Opp / Game", format="%.1f"
-                    )
-                ),
-                "volatility_score": st.column_config.NumberColumn(
-                    "Avg Volatility", format=VOLATILITY_FORMAT
-                ),
-                "consistency_eligible": st.column_config.CheckboxColumn(
-                    "Consistency Eligible"
-                ),
-                "quality_score": st.column_config.NumberColumn(
-                    "Quality", format="%.1f"
-                ),
-            },
-        )
-
 
 # ============================================================
 # 13. FOOTER
@@ -2417,7 +2348,7 @@ else:
 
 st.divider()
 
-st.markdown("### RosterWatch")
+st.markdown("### RosterWatch 🏈")
 
 st.caption(
     "NFL Weekly Volatility Analytics | "

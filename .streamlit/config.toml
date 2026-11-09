@@ -2,25 +2,10 @@
 # started from the repository root:
 #     streamlit run frontend/streamlit_app/app.py
 #
-# Colors follow the UI/UX Pro Max "Financial Dashboard" dark palette and
-# fonts its "Dashboard Data" pairing (Fira Code for numbers and headings,
-# Fira Sans for text). frontend/streamlit_app/app.py uses the same values
-# for its charts and custom HTML.
+# The blue gradient and card colors are set in the CSS at the top of
+# frontend/streamlit_app/app.py. A dark base keeps Streamlit's own tables
+# and widgets readable on that background even when the viewer's computer
+# is in light mode. Fonts are Streamlit's default.
 
 [theme]
 base = "dark"
-primaryColor = "#22C55E"
-backgroundColor = "#020617"
-secondaryBackgroundColor = "#1A1E2F"
-textColor = "#F8FAFC"
-borderColor = "#334155"
-dataframeHeaderBackgroundColor = "#0E1223"
-showWidgetBorder = true
-baseRadius = "0.5rem"
-font = "Fira Sans:https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&display=swap"
-headingFont = "Fira Code:https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&display=swap"
-codeFont = "Fira Code:https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap"
-
-[theme.sidebar]
-backgroundColor = "#0E1223"
-secondaryBackgroundColor = "#1A1E2F"

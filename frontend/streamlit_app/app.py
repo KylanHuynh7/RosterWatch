@@ -759,21 +759,12 @@ position = st.sidebar.selectbox(
 
 st.sidebar.divider()
 
-st.sidebar.markdown("**Active Analytics Model**")
-st.sidebar.caption("Weekly Volatility Model")
+st.sidebar.markdown("**Weekly Volatility Model**")
+st.sidebar.caption("2022–2025 NFL Seasons")
+st.sidebar.caption("Weeks 1-18")
+st.sidebar.caption("RB / WR / TE")
 
-st.sidebar.markdown("**Ranking Method**")
-st.sidebar.caption(
-    "Average weekly volatility + meaningful usage thresholds"
-)
 
-st.sidebar.markdown("**Data Source**")
-st.sidebar.caption("Matt's NFL Weekly Usage Dataset")
-
-st.sidebar.markdown("**Fantasy Scoring**")
-st.sidebar.caption(
-    "Sleeper PPR — display only, excluded from model"
-)
 
 
 # ============================================================

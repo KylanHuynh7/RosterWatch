@@ -712,22 +712,19 @@ with st.expander(
 
     st.markdown("**Variables:**")
 
-    scored_names = [
-        f"{METRIC_LABELS[m].lower()} {POSITION_WEIGHTS[POSITIONS[0]][m]:.0%}"
-        for m in weighted_metrics(POSITIONS[0])
+    scored_metrics_any = [
+        m for m in METRICS
+        if any(POSITION_WEIGHTS[p][m] > 0 for p in POSITIONS)
     ]
-    unscored = [
-        METRIC_LABELS[m].lower()
-        for m in METRICS
-        if POSITION_WEIGHTS[POSITIONS[0]][m] == 0
-    ]
+    unscored_metrics = [m for m in METRICS if m not in scored_metrics_any]
+    metric_names = " or ".join(
+        f"{METRIC_LABELS[m].lower()} ({METRIC_SYMBOLS[m]})"
+        for m in scored_metrics_any
+    )
     weights_text = (
-        ", ".join(scored_names)
-        + (
-            f"; {' and '.join(unscored)} 0% (shown in each player's "
-            "weekly data, not scored)"
-            if unscored
-            else ""
+        ", ".join(
+            f"{METRIC_LABELS[m].lower()} {POSITION_WEIGHTS[POSITIONS[0]][m]:.0%}"
+            for m in weighted_metrics(POSITIONS[0])
         )
         if same_weights_everywhere()
         else "set by position (see the table below)"
@@ -739,8 +736,7 @@ with st.expander(
         f"""
 - **Vₜ:** the volatility score for week t, as a % of a normal week for
   the position: 100% = a normal week, 200% = twice the usual change.
-- **m:** a usage metric: snap percentage (S), opportunity share (O),
-  passing-down share (P), or red-zone share (R).
+- **m:** a usage metric in the score: {metric_names}.
 - **wₘ:** the metric's weight: {weights_text}. The weights add up
   to 100%.
 - **Δmₜ:** the change since the player's previous game.
@@ -762,6 +758,26 @@ with st.expander(
   {MIN_ROLE_SNAP_PCT:.0%}+ of snaps.
 """
     )
+
+    # Why the zero-weight metrics are left out (see POSITION_WEIGHTS in
+    # src/volatility.py).
+    unscored_reasons = {
+        "passdown_share": "added nothing on top of snap percentage and "
+        "opportunity share when tested",
+        "redzone_share": "is 0 in most games",
+    }
+    if unscored_metrics:
+        st.caption(
+            " and ".join(METRIC_LABELS[m] for m in unscored_metrics)
+            + " are not in the score (0% weight) and are shown in each "
+            "player's weekly data only. "
+            + "; ".join(
+                f"{METRIC_LABELS[m]} {unscored_reasons[m]}"
+                for m in unscored_metrics
+                if m in unscored_reasons
+            )
+            + "."
+        )
 
     st.markdown("#### Why divide by a normal week?")
 
@@ -1298,15 +1314,21 @@ else:
             st.success(
                 f"**Consistency quality score: {row['quality_score']:.1f}**"
                 f" (#{rank} of {len(pool)} eligible {player_position}s)"
-                f"\n\n{quality_breakdown(row)}: "
-                + ", ".join(
-                    f"{QUALITY_LABELS[part].lower()} "
-                    f"{row[column]:.1f}"
-                    for part, column in QUALITY_COLUMNS.items()
-                )
-                + " (percentiles among eligible "
-                f"{player_position}s, 100 = best)."
             )
+
+            with st.expander("How his quality score is calculated"):
+                st.markdown(
+                    f"{quality_breakdown(row)}: "
+                    + ", ".join(
+                        f"{QUALITY_LABELS[part].lower()} "
+                        f"{row[column]:.1f}"
+                        for part, column in QUALITY_COLUMNS.items()
+                    )
+                    + f". Each part is a percentile among the {len(pool)} "
+                    f"eligible {player_position}s (100 = best): steadiness "
+                    "ranks low volatility, snaps ranks average snap %, and "
+                    "touches ranks carries + targets per game."
+                )
 
         else:
 
@@ -1690,9 +1712,9 @@ else:
 
     st.write(
         "How much the player's usage changed since his previous game, "
-        f"as a % of a normal {player_position} week: "
-        f"{score_formula(player_position)}. Each bar is split into the "
-        "part each metric adds; the dotted line is a normal week (100%)."
+        f"as a % of a normal {player_position} week. Each bar is split "
+        "into the part snap share and opportunity share add; the dotted "
+        "line is a normal week (100%)."
     )
 
     by_week = player_weekly.set_index("week").reindex(WEEKS)
@@ -1854,12 +1876,18 @@ else:
                     "these weights are scaled up to 100%."
                 )
 
-            st.info(
-                f"**Week {highlighted_week} volatility: "
-                f"{selected_score:.0%} of a normal week** (compared with "
-                f"Week {previous}) = " + " + ".join(terms)
-                + "\n\n" + "\n".join(steps)
-            )
+            with st.expander(
+                f"How Week {highlighted_week}'s volatility "
+                f"({selected_score:.0%}) is calculated"
+            ):
+                st.markdown(
+                    f"**Week {highlighted_week} volatility: "
+                    f"{selected_score:.0%} of a normal week** (compared "
+                    f"with Week {previous}) = " + " + ".join(terms)
+                    + f"\n\nWeekly volatility = {score_formula(player_position)}. "
+                    "Each score is the change ÷ a normal week's change:"
+                    "\n\n" + "\n".join(steps)
+                )
 
         else:
 
@@ -2221,6 +2249,8 @@ else:
             for part in QUALITY_COLUMNS
         )
 
+        example_row = None
+
         if eligible_players.empty:
 
             st.info(
@@ -2323,23 +2353,30 @@ else:
                     },
                 )
 
-                top = most_consistent.iloc[0]
+                example_row = most_consistent.iloc[0]
 
-                st.caption(
-                    f"Quality = {quality_formula}. Each part is a "
-                    "percentile among all "
-                    f"{len(eligible_players)} eligible {ranking_position}s "
-                    "(100 = best), so the slider doesn't change it. "
-                    f"{top['player_name']}: {quality_breakdown(top)}."
+        with st.expander("How the quality score and requirements work"):
+
+            st.markdown(
+                f"**Quality = {quality_formula}.** Each part is a "
+                "percentile among all "
+                f"{len(eligible_players)} eligible {ranking_position}s "
+                "(100 = best), so the slider doesn't change it."
+                + (
+                    f" Example, {example_row['player_name']}: "
+                    f"{quality_breakdown(example_row)}."
+                    if example_row is not None
+                    else ""
                 )
+            )
 
-        st.caption(
-            "Requirements: played "
-            f"{MIN_GAMES_SHARE:.0%}+ of his team's games in these weeks, "
-            f"{thresholds['min_snap_pct']:.0%}+ average snaps, and "
-            f"{thresholds['min_opportunities_per_week']}+ carries + "
-            "targets per game."
-        )
+            st.markdown(
+                "**Requirements:** played "
+                f"{MIN_GAMES_SHARE:.0%}+ of his team's games in these weeks, "
+                f"{thresholds['min_snap_pct']:.0%}+ average snaps, and "
+                f"{thresholds['min_opportunities_per_week']}+ carries + "
+                "targets per game."
+            )
 
 
 # ============================================================

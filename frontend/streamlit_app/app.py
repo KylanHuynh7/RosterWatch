@@ -1326,9 +1326,7 @@ st.html("""
         <span class="pill">Model 1 · Volatility</span>
         <span class="pill">Model 2 · Waiver Score</span>
         <span class="pill">Full-Season Analysis</span>
-        <span class="pill">ESPN Ownership ≤ 40%</span>
         <span class="pill">RB / WR / TE</span>
-        <span class="pill">Sleeper PPR</span>
         <span class="pill">Weeks 1–18</span>
     </div>
 </div>
@@ -1369,10 +1367,6 @@ st.sidebar.caption("Weekly Usage Volatility")
 st.sidebar.markdown("**Model 2**")
 st.sidebar.caption(
     "Full-Season Waiver Opportunity"
-)
-
-st.sidebar.caption(
-    "PPR is displayed for context only."
 )
 
 
@@ -2182,17 +2176,6 @@ st.caption(
     "2022–2025 | RB · WR · TE | Weeks 1–18"
 )
 
-st.caption(
-    "Model 1 uses the selected week-range slider. "
-    "Model 2 analyzes Weeks 1 through its selected "
-    "NFL week."
-)
-
-st.caption(
-    "Waiver scores are experimental and have not "
-    "been calibrated through historical backtesting. "
-    "Roster availability is not verified."
-)
 
 st.caption(
     "Built with Python, Pandas, Plotly, and Streamlit."

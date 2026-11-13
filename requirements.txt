@@ -15,4 +15,5 @@ google-cloud-bigquery
 db-dtypes
 streamlit
 plotly
+plotly
 pytest

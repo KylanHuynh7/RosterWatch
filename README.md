@@ -1,6 +1,6 @@
 
 # RosterWatch 🏈
-###NFL Usage Analytics & Fantasy Football Waiver Intelligence
+NFL Usage Analytics & Fantasy Football Waiver Intelligence
 
 RosterWatch is an interactive NFL analytics dashboard built with Python and Streamlit. It analyzes player usage patterns, fantasy football production, and weekly trends to help users understand player consistency and identify potential waiver-wire opportunities.
 

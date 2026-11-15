@@ -53,10 +53,36 @@ The project aims to answer two questions:
 | Python | Data processing and model implementation |
 | Pandas | Data manipulation and aggregation |
 | NumPy | Numerical calculations |
+| nflreadpy | NFL snap counts, player stats, play-by-play and player IDs |
+| Requests | Calls to the Sleeper and ESPN APIs |
 | Streamlit | Interactive dashboard |
 | Plotly | Data visualizations |
 | Parquet / CSV | Historical data storage |
 | Git / GitHub | Version control and collaboration |
+
+### Libraries
+
+All libraries are listed in `requirements.txt`.
+
+| Library | Used in | Link |
+|---|---|---|
+| pandas | notebook, dashboard, models, tests | https://pandas.pydata.org/ |
+| NumPy | notebook, dashboard | https://numpy.org/ |
+| nflreadpy | notebook (data pull) | https://github.com/nflverse/nflreadpy |
+| Requests | notebook (Sleeper API) | https://requests.readthedocs.io/ |
+| PyArrow | reading and writing Parquet files | https://arrow.apache.org/docs/python/ |
+| Matplotlib | notebook (exploratory plots) | https://matplotlib.org/ |
+| Streamlit | dashboard | https://streamlit.io/ |
+| Plotly | dashboard charts | https://plotly.com/python/ |
+| JupyterLab | running the notebook | https://jupyter.org/ |
+| pytest | tests | https://docs.pytest.org/ |
+| seaborn | listed in requirements, not used yet | https://seaborn.pydata.org/ |
+| scikit-learn | listed in requirements, not used yet | https://scikit-learn.org/ |
+| python-dotenv | listed in requirements, not used yet | https://github.com/theskumar/python-dotenv |
+| google-cloud-bigquery | listed in requirements, not used yet | https://cloud.google.com/python/docs/reference/bigquery/latest |
+| db-dtypes | listed in requirements, not used yet | https://github.com/googleapis/python-db-dtypes-pandas |
+
+The notebook also uses Python's standard library (`json`, `math`, `datetime`, `pathlib`, `urllib.request`) for the ESPN request.
 
 ## 4. System Architecture
 
@@ -105,7 +131,26 @@ The dashboard uses historical data through the selected week to avoid incorporat
 
 ## 5. Data Sources & Processing
 
-RosterWatch uses historical weekly NFL player usage data for the 2022–2025 seasons.
+RosterWatch uses historical weekly NFL player usage data for the 2022–2025 regular seasons (weeks 1–18), built by `notebooks/weekly_usage.ipynb`.
+
+### Data Sources
+
+| Source | What it provides | How it is accessed |
+|---|---|---|
+| nflverse (https://github.com/nflverse/nflverse-data) | Weekly offensive snap counts (originally from Pro Football Reference), player stats, play-by-play, and player information | nflreadpy: `load_snap_counts`, `load_player_stats`, `load_pbp`, `load_players` |
+| DynastyProcess player IDs (https://github.com/dynastyprocess/data) | Cross-reference between NFL (`gsis_id`), Sleeper and ESPN player IDs | nflreadpy: `load_ff_playerids` |
+| Sleeper API (https://docs.sleeper.com/) | Weekly PPR fantasy points (`fantasy_points_ppr`) | `https://api.sleeper.com/stats/nfl/{season}/{week}` (a public stats endpoint not covered in the official docs) |
+| ESPN Fantasy API (unofficial, no public documentation) | Current-season % rostered, % started and injury status | `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}/segments/0/leaguedefaults/3?view=kona_player_info` |
+
+None of these sources needs an API key.
+
+### Data Files
+
+| File | Contents |
+|---|---|
+| `notebooks/weekly_usage.parquet` | One row per player-game (RB, WR, TE), 2022–2025 |
+| `notebooks/weekly_usage.csv` | The same table as CSV |
+| `notebooks/espn_ownership.csv` | ESPN % rostered snapshot for the 2026 season, with the time it was collected (`collected_at_utc`); not used by the dashboard yet |
 
 ### Important Dataset Fields
 
@@ -135,14 +180,18 @@ The application:
 6. Calculates opportunities using targets plus carries.
 7. Prepares player histories for model calculations.
 
-The dashboard supports the following dataset locations:
+### Data Location
+
+The notebook saves its output to `notebooks/`, which is where the data is stored in the repository.
+
+The dashboard reads the data from `data/processed/`. It uses `weekly_usage.parquet` if present, otherwise `weekly_usage.csv`:
 
 ```text
 data/processed/weekly_usage.parquet
-RosterWatch-matt/notebooks/weekly_usage.parquet
 data/processed/weekly_usage.csv
-RosterWatch-matt/notebooks/weekly_usage.csv
 ```
+
+`data/` is listed in `.gitignore`, so this folder is not part of the repository. Copy the file there before launching the dashboard (see Section 9).
 
 ## 6. Model 1: Weekly Usage Volatility
 
@@ -334,29 +383,44 @@ These classifications are analytical indicators, not guaranteed predictions of f
 
 ## 8. Repository Structure
 
-The following shows the main application structure and expected supporting project components.
-
 ```text
 RosterWatch/
+├── docs/
+│   ├── AGENTS.md                  # guidelines for AI coding agents
+│   ├── DesignDoc.md               # design document template
+│   └── codeReviewer.md            # code review guidelines
 ├── frontend/
-│   └── streamlit_app/
-│       └── app.py
-├── data/
-│   └── processed/
-│       └── weekly_usage.parquet
-├── RosterWatch-matt/
-│   └── notebooks/
-│       └── weekly_usage.parquet
+│   ├── streamlit_app/
+│   │   └── app.py                 # Streamlit dashboard (Model 1 and Model 2)
+│   └── README.md
+├── infra/
+│   └── README.md                  # placeholder for deployment
+├── models/
+│   ├── .gitkeep
+│   └── usage_models.py            # earlier usage scoring prototype
+├── notebooks/
+│   ├── README.md
+│   ├── espn_ownership.csv         # ESPN % rostered snapshot
+│   ├── weekly_usage.csv           # weekly usage data (CSV)
+│   ├── weekly_usage.ipynb         # data pull and cleaning
+│   └── weekly_usage.parquet       # weekly usage data (Parquet)
 ├── pipelines/
-├── requirements.txt
-├── .gitignore
+│   └── score_players.py           # runs the prototype from the command line
+├── results/
+│   └── .gitkeep
+├── src/
+│   ├── __init__.py
+│   └── example.py                 # project template example
+├── tests/
+│   ├── test_example.py
+│   └── test_usage_models.py
 ├── .env.example
-└── README.md
+├── .gitignore
+├── README.md
+└── requirements.txt
 ```
 
-Dataset locations are alternatives; not every listed dataset needs to exist simultaneously.
-
-Additional documentation, testing, and evaluation files should be maintained separately as the project develops.
+`data/processed/` is created locally during setup (Section 9) and is not tracked by Git.
 
 ## 9. Installation & Local Setup
 
@@ -374,11 +438,7 @@ git clone https://github.com/KylanHuynh7/RosterWatch.git
 cd RosterWatch
 ```
 
-To use the dashboard feature branch:
-
-```bash
-git switch feature/rosterwatch-full-dashboard
-```
+All commands below are run from the repository root on the `main` branch.
 
 ### Create a Virtual Environment
 
@@ -402,19 +462,41 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-Ensure the requirements file includes the packages needed by the dashboard, including Streamlit, Pandas, NumPy, Plotly, and a compatible Parquet reader if using Parquet files.
+This installs everything in Section 3, including Streamlit, Plotly, nflreadpy and PyArrow (for Parquet files).
 
 ### Environment Configuration
 
-If environment variables are required by a pipeline or deployment, create a local `.env` file based on `.env.example`.
+The dashboard and the notebook do not need any environment variables or API keys.
 
-Do not commit passwords, API keys, or other secrets.
-
-The Streamlit dashboard itself may not require environment variables when running exclusively from local data files.
+`.env.example` is a template from the project starter. If a future pipeline needs settings, copy it to `.env` and fill in your own values. `.env` is listed in `.gitignore`; never commit passwords, API keys, or other secrets.
 
 ### Prepare the Dataset
 
-Place the weekly usage dataset in one of the supported data locations described in Section 5.
+Copy the data from `notebooks/` into `data/processed/`, where the dashboard looks for it.
+
+macOS/Linux:
+
+```bash
+mkdir -p data/processed
+cp notebooks/weekly_usage.parquet data/processed/
+```
+
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force data/processed
+Copy-Item notebooks/weekly_usage.parquet data/processed/
+```
+
+### Refresh the Data (Optional)
+
+The repository already includes the data, so this step is only needed to pull newer games or a new ESPN snapshot. Open `notebooks/weekly_usage.ipynb` in JupyterLab and run all cells from the `notebooks/` folder:
+
+```bash
+jupyter lab notebooks/weekly_usage.ipynb
+```
+
+The notebook writes `weekly_usage.csv`, `weekly_usage.parquet` and `espn_ownership.csv` into `notebooks/`. Then repeat the copy step above.
 
 ### Launch the Dashboard
 
@@ -474,7 +556,20 @@ Actual evaluation results, charts, and case studies should be added after runnin
 
 ## 12. Testing
 
-Recommended automated test coverage includes:
+Run the test suite from the repository root:
+
+```bash
+python -m pytest
+```
+
+Current tests:
+
+- `tests/test_usage_models.py`: checks the earlier usage scoring prototype in `models/usage_models.py`.
+- `tests/test_example.py`: checks the project template example in `src/`.
+
+The dashboard's Model 1 and Model 2 calculations in `frontend/streamlit_app/app.py` are not covered by automated tests yet.
+
+Recommended additional test coverage includes:
 
 - Data loading and validation
 - Duplicate handling
@@ -485,8 +580,6 @@ Recommended automated test coverage includes:
 - Waiver score normalization
 - Missing-data behavior
 - Prevention of future-week data leakage
-
-Testing status and execution commands should be documented once the test suite has been verified.
 
 ## 13. Limitations
 

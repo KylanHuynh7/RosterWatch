@@ -203,7 +203,7 @@ A lower volatility score indicates a more stable offensive role.
 
 ### Equation
 
-\[
+```math
 V_t =
 w_S |S_t-S_{t-1}|
 +
@@ -212,16 +212,16 @@ w_O |O_t-O_{t-1}|
 w_P |P_t-P_{t-1}|
 +
 w_R |R_t-R_{t-1}|
-\]
+```
 
 Where:
 
-- \(V_t\): Weekly usage volatility
-- \(S_t\): Snap share
-- \(O_t\): Opportunity share
-- \(P_t\): Passing-down share
-- \(R_t\): Red-zone share
-- \(w_S,w_O,w_P,w_R\): Position-specific weights
+- $`V_t`$: Weekly usage volatility
+- $`S_t`$: Snap share
+- $`O_t`$: Opportunity share
+- $`P_t`$: Passing-down share
+- $`R_t`$: Red-zone share
+- $`w_S,w_O,w_P,w_R`$: Position-specific weights
 
 ### Position-Specific Weights
 
@@ -239,11 +239,11 @@ For example, opportunity share receives the greatest weight for running backs be
 
 A player's overall volatility is calculated by averaging valid consecutive-week volatility measurements:
 
-\[
+```math
 V_{\text{season}}=\frac{1}{m}\sum_{t=1}^{m}V_t
-\]
+```
 
-Where \(m\) is the number of valid consecutive-week comparisons.
+Where $`m`$ is the number of valid consecutive-week comparisons.
 
 Nonconsecutive weeks are not directly compared.
 
@@ -261,17 +261,17 @@ Players must also have at least eight valid consecutive-week comparisons.
 
 ### Consistency Quality Score
 
-\[
+```math
 Q=100\left[
 0.50(1-R_V)+0.25R_S+0.25R_O
 \right]
-\]
+```
 
 Where:
 
-- \(R_V\): Volatility percentile rank
-- \(R_S\): Average snap-share percentile rank
-- \(R_O\): Average opportunity percentile rank
+- $`R_V`$: Volatility percentile rank
+- $`R_S`$: Average snap-share percentile rank
+- $`R_O`$: Average opportunity percentile rank
 
 Ranks are calculated among players in the same season and position.
 
@@ -287,7 +287,7 @@ Unlike Model 1, Model 2 directly incorporates fantasy football performance.
 
 ### Overall Equation
 
-\[
+```math
 W=100(
 0.40F+
 0.20O+
@@ -295,16 +295,16 @@ W=100(
 0.15V+
 0.10T
 )
-\]
+```
 
 Where:
 
-- \(W\): Base waiver opportunity score
-- \(F\): Fantasy performance score
-- \(O\): Opportunity share score
-- \(S\): Snap share score
-- \(V\): Stability score
-- \(T\): Trend confirmation score
+- $`W`$: Base waiver opportunity score
+- $`F`$: Fantasy performance score
+- $`O`$: Opportunity share score
+- $`S`$: Snap share score
+- $`V`$: Stability score
+- $`T`$: Trend confirmation score
 
 Each component is normalized to a 0–1 scale.
 
@@ -324,18 +324,18 @@ The implementation may additionally adjust the base score based on available dat
 
 Fantasy stability measures how consistently a player produces PPR fantasy points.
 
-\[
+```math
 F_{\text{stability}}=
 \frac{1}{
 1+\frac{\sigma_{\text{PPR}}}
 {\max(|\mu_{\text{PPR}}|,2)}
 }
-\]
+```
 
 Where:
 
-- \(\sigma_{\text{PPR}}\): Standard deviation of fantasy points
-- \(\mu_{\text{PPR}}\): Average fantasy points
+- $`\sigma_{\text{PPR}}`$: Standard deviation of fantasy points
+- $`\mu_{\text{PPR}}`$: Average fantasy points
 
 Lower fantasy-point variation generally produces higher stability.
 
@@ -343,28 +343,28 @@ Lower fantasy-point variation generally produces higher stability.
 
 Usage stability incorporates the weekly volatility calculated by Model 1.
 
-\[
+```math
 V_{\text{combined}}=
 0.65V_{\text{recent}}+
 0.35V_{\text{season}}
-\]
+```
 
-\[
+```math
 U_{\text{stability}}=
 \frac{1}{
 1+\frac{V_{\text{combined}}}{0.12}
 }
-\]
+```
 
 Recent volatility receives greater weight because recent offensive usage is more relevant to current roster decisions.
 
 ### Combined Stability Score
 
-\[
+```math
 V=
 0.60F_{\text{stability}}+
 0.40U_{\text{stability}}
-\]
+```
 
 This score contributes 15% of the overall waiver opportunity score.
 

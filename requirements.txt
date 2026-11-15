@@ -7,9 +7,13 @@ scikit-learn>=1.4
 python-dotenv>=1.0
 pytest>=8.0
 nflreadpy
+pandas
+numpy
 pyarrow
 requests
 google-cloud-bigquery
 db-dtypes
 streamlit
 plotly
+plotly
+pytest

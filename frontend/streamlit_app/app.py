@@ -2800,10 +2800,6 @@ st.caption(
     "Model 2: Fantasy PPR Waiver Opportunity"
 )
 
-st.caption(
-    "Must Start overrides other waiver flags "
-    "for Model 1 consistency-eligible players."
-)
 
 st.caption(
     "2022–2025 | RB · WR · TE | Weeks 1–18"

@@ -1,0 +1,8 @@
+# Minimal runtime deps for the Cloud Run container (the full requirements.txt includes notebook/ML tooling).
+streamlit==1.57.0
+pandas>=2.2
+numpy>=1.26
+pyarrow
+plotly
+google-cloud-bigquery
+db-dtypes

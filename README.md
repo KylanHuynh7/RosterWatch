@@ -21,7 +21,7 @@ The project aims to answer two questions:
 
 ## 2. Key Features
 
-### Model 1: Weekly Usage Volatility
+### Player Consistency Model (weekly usage volatility)
 - Measures week-to-week changes in offensive involvement.
 - Analyzes snap share, opportunity share, passing-down share, and red-zone share.
 - Uses position-specific weights for RBs, WRs, and TEs.
@@ -29,17 +29,16 @@ The project aims to answer two questions:
 - Includes eligibility thresholds to exclude players with insufficient participation.
 - Provides interactive weekly charts and player comparisons.
 
-### Model 2: Waiver Opportunity Score
-- Evaluates fantasy production and offensive involvement.
-- Combines five weighted analytical components.
-- Accounts for recent performance, usage stability, and trend confirmation.
-- Produces a waiver opportunity score on a 0–100 scale.
-- Categorizes players into waiver recommendation groups.
+### Waiver Wire Alerts (waiver opportunity score and flags)
+- Scores only players rostered in at most 50% of ESPN leagues.
+- Combines five weighted components: fantasy points, opportunity share, snap share, stability, and trend confirmation.
+- Produces a waiver score on a 0–100 scale, lowered for players with few valid games.
+- Gives every scored player one of four flags: Must Pick Up, Slow Riser, Slow Drop, or Must Drop.
 - Uses only data available through the selected NFL week.
 
 ### Interactive Dashboard
 - Season and position filters.
-- Adjustable Model 1 week range.
+- Adjustable week range for the Player Consistency Model.
 - Player exploration tools.
 - Interactive Plotly visualizations.
 - Consistency and volatility leaderboards.
@@ -98,16 +97,17 @@ Historical NFL Player Data
  Data Cleaning & Validation
             |
             v
-    Weekly Usage Dataset
-            |
-      +-----+-----+
+    Weekly Usage Dataset            ESPN % Rostered Snapshot
+            |                                  |
+      +-----+-----+                            |
+      |           |                            |
+      v           v                            |
+ Player         Waiver Wire  <-----------------+
+ Consistency    Alerts         (only players <= 50% rostered)
+ Model
       |           |
       v           v
-   Model 1      Model 2
-  Volatility    Waiver Score
-      |           |
-      v           v
- Consistency   Waiver Rankings
+ Consistency   Waiver Rankings, Flags
   Rankings     & Player Trends
       |           |
       +-----+-----+
@@ -123,9 +123,9 @@ Historical NFL Player Data
 
 The application separates its analytical responsibilities into two models.
 
-Model 1 focuses on offensive role stability without directly incorporating fantasy points. This makes it possible to evaluate usage consistency independently of fantasy scoring outcomes.
+The Player Consistency Model focuses on offensive role stability without directly incorporating fantasy points. This makes it possible to evaluate usage consistency independently of fantasy scoring outcomes.
 
-Model 2 incorporates fantasy points alongside offensive usage, stability, and recent trends to support waiver-wire analysis.
+Waiver Wire Alerts incorporate fantasy points alongside offensive usage, stability, and recent trends to support waiver-wire analysis. They reuse the weekly volatility from the Player Consistency Model as part of their stability score.
 
 The dashboard uses historical data through the selected week to avoid incorporating future game results into that week's analysis.
 
@@ -150,7 +150,7 @@ None of these sources needs an API key.
 |---|---|
 | `notebooks/weekly_usage.parquet` | One row per player-game (RB, WR, TE), 2022–2025 |
 | `notebooks/weekly_usage.csv` | The same table as CSV |
-| `notebooks/espn_ownership.csv` | ESPN % rostered snapshot for the 2026 season, with the time it was collected (`collected_at_utc`); not used by the dashboard yet |
+| `notebooks/espn_ownership.csv` | ESPN % rostered snapshot (`ownership_season`, `gsis_id`, `percentOwned`, with the time it was collected in `collected_at_utc`). Waiver Wire Alerts use it to keep only players rostered in at most 50% of leagues |
 
 ### Important Dataset Fields
 
@@ -184,20 +184,23 @@ The application:
 
 The notebook saves its output to `notebooks/`, which is where the data is stored in the repository.
 
-The dashboard reads the data from `data/processed/`. It uses `weekly_usage.parquet` if present, otherwise `weekly_usage.csv`:
+The dashboard reads the data from `data/processed/`. It uses `weekly_usage.parquet` if present, otherwise `weekly_usage.csv`, and it needs `espn_ownership.csv` for Waiver Wire Alerts:
 
 ```text
 data/processed/weekly_usage.parquet
 data/processed/weekly_usage.csv
+data/processed/espn_ownership.csv
 ```
 
-`data/` is listed in `.gitignore`, so this folder is not part of the repository. Copy the file there before launching the dashboard (see Section 9).
+`data/` is listed in `.gitignore`, so this folder is not part of the repository. Copy the files there before launching the dashboard (see Section 9). If `espn_ownership.csv` is missing, the Player Consistency Model still loads but Waiver Wire Alerts stop with an error.
 
-## 6. Model 1: Weekly Usage Volatility
+The dashboard keeps ownership rows for the 2022–2025 seasons only, matched to the selected season through `ownership_season`. The snapshot currently in `notebooks/` is labeled `ownership_season` 2026, so Waiver Wire Alerts show no players until an ownership file for 2022–2025 is added.
+
+## 6. Player Consistency Model (Weekly Usage Volatility)
 
 ### Objective
 
-Model 1 measures how much a player's offensive involvement changes between consecutive NFL weeks.
+The Player Consistency Model measures how much a player's offensive involvement changes between consecutive NFL weeks.
 
 A lower volatility score indicates a more stable offensive role.
 
@@ -240,16 +243,16 @@ For example, opportunity share receives the greatest weight for running backs be
 A player's overall volatility is calculated by averaging valid consecutive-week volatility measurements:
 
 ```math
-V_{\text{season}}=\frac{1}{m}\sum_{t=1}^{m}V_t
+\bar{V}=\frac{1}{m}\sum_{t\in T}V_t
 ```
 
-Where $`m`$ is the number of valid consecutive-week comparisons.
+Where $`T`$ is the set of weeks in the selected range with a valid comparison to the previous week, and $`m`$ is the number of those weeks.
 
 Nonconsecutive weeks are not directly compared.
 
 ### Consistency Eligibility
 
-To prevent players with very limited participation from appearing artificially consistent, Model 1 uses minimum participation thresholds.
+To prevent players with very limited participation from appearing artificially consistent, the Player Consistency Model uses minimum participation thresholds.
 
 | Position | Minimum Weeks | Minimum Avg. Snap Share | Minimum Opportunities/Game |
 |---|---:|---:|---:|
@@ -262,124 +265,112 @@ Players must also have at least eight valid consecutive-week comparisons.
 ### Consistency Quality Score
 
 ```math
-Q=100\left[
-0.50(1-R_V)+0.25R_S+0.25R_O
-\right]
+Q=100\left(0.50\,C+0.25\,S_{\text{rank}}+0.25\,O_{\text{rank}}\right),
+\qquad C=1-\operatorname{pct}(\bar{V})
 ```
 
 Where:
 
-- $`R_V`$: Volatility percentile rank
-- $`R_S`$: Average snap-share percentile rank
-- $`R_O`$: Average opportunity percentile rank
+- $`C`$: Consistency, one minus the volatility percentile rank
+- $`S_{\text{rank}}`$: Average snap-share percentile rank
+- $`O_{\text{rank}}`$: Average opportunity-share percentile rank
 
-Ranks are calculated among players in the same season and position.
+Ranks are calculated among eligible players in the same season and position.
 
 A higher quality score rewards low volatility combined with meaningful offensive participation.
 
-## 7. Model 2: Waiver Opportunity Score
+## 7. Waiver Wire Alerts (Waiver Opportunity Score)
 
 ### Objective
 
-Model 2 evaluates potential waiver-wire opportunities by combining fantasy production, offensive usage, stability, and recent trends.
+Waiver Wire Alerts evaluate potential waiver-wire opportunities by combining fantasy production, offensive usage, stability, and recent trends. As of a chosen week, they ask whose production and usage are rising or falling, and whether the move is backed by the player's role.
 
-Unlike Model 1, Model 2 directly incorporates fantasy football performance.
+Unlike the Player Consistency Model, Waiver Wire Alerts directly incorporate fantasy football performance.
+
+### Who Is Scored
+
+Only players matched by `gsis_id` to the ESPN snapshot and rostered in at most 50% of leagues (`MAX_PERCENT_OWNED`) are scored. The filter is applied before scoring, so heavily rostered starters never appear. The snapshot is a single collection, not weekly ownership history.
+
+### Windows
+
+A valid game has snap share, opportunity share, opportunities, and a PPR score. The recent window is the last 2–4 valid games (one third of the player's valid games, at least 2 and at most 4). The previous window is every valid game before it.
 
 ### Overall Equation
 
 ```math
-W=100(
-0.40F+
-0.20O+
-0.15S+
-0.15V+
-0.10T
-)
+W=100\left(0.40F+0.20O+0.15S+0.15V+0.10T\right)\times E
 ```
 
 Where:
 
-- $`W`$: Base waiver opportunity score
+- $`W`$: Waiver score, 0–100
 - $`F`$: Fantasy performance score
 - $`O`$: Opportunity share score
 - $`S`$: Snap share score
 - $`V`$: Stability score
 - $`T`$: Trend confirmation score
+- $`E`$: Evidence factor
 
-Each component is normalized to a 0–1 scale.
+Each component is kept on a 0–1 scale.
 
-The implementation may additionally adjust the base score based on available data coverage.
+### Position Benchmarks
 
-### Model 2 Component Weights
+| Position | PPR points per game $`B_p`$ | Snap share $`B_s`$ | Opportunity share $`B_o`$ | PPR trend scale $`s_p`$ |
+|---|---:|---:|---:|---:|
+| RB | 12.0 | 50% | 18% | 6 |
+| WR | 12.0 | 65% | 17% | 6 |
+| TE | 8.0 | 60% | 13% | 4 |
 
-| Component | Weight | Purpose |
-|---|---:|---|
-| Fantasy PPR Performance | 40% | Measures fantasy production |
-| Opportunity Share | 20% | Measures involvement in offensive opportunities |
-| Snap Share | 15% | Measures playing time |
-| Volatility & Stability | 15% | Measures consistency |
-| Trend Confirmation | 10% | Evaluates recent improvement or decline |
+The benchmarks are set in `MODEL2_SETTINGS` in `app.py`. A player at or above a benchmark gets full credit for that part of the score; they are not minimums.
 
-### Fantasy Point Stability
+### Trends
 
-Fantasy stability measures how consistently a player produces PPR fantasy points.
+Each trend compares the recent window with the previous window and is clipped to −1 to +1:
 
 ```math
-F_{\text{stability}}=
-\frac{1}{
-1+\frac{\sigma_{\text{PPR}}}
-{\max(|\mu_{\text{PPR}}|,2)}
-}
+\tau_x=\max\!\left(-1,\ \min\!\left(1,\ \frac{\bar{x}_{\text{recent}}-\bar{x}_{\text{previous}}}{s_x}\right)\right)
 ```
+
+Where $`x`$ is PPR points ($`\tau_p`$), opportunity share ($`\tau_o`$), or snap share ($`\tau_s`$), with scales $`s_p=B_p/2`$, $`s_o=0.06`$, and $`s_s=0.10`$.
+
+### Components
+
+| Component | Weight | Formula |
+|---|---:|---|
+| $`F`$ Fantasy performance | 40% | $`0.75\left[0.65\min\left(1,\frac{\bar{p}_{\text{recent}}}{B_p}\right)+0.35\min\left(1,\frac{\tilde{p}_{\text{recent}}}{B_p}\right)\right]+0.25\cdot\frac{1+\tau_p}{2}`$, where $`\tilde{p}`$ is the recent median |
+| $`O`$ Opportunity share | 20% | $`0.80\min\left(1,\frac{\bar{o}_{\text{recent}}}{B_o}\right)+0.20\cdot\frac{1+\tau_o}{2}`$ |
+| $`S`$ Snap share | 15% | $`0.80\min\left(1,\frac{\bar{s}_{\text{recent}}}{B_s}\right)+0.20\cdot\frac{1+\tau_s}{2}`$ |
+| $`V`$ Stability | 15% | $`0.60\cdot\frac{1}{1+CV_p}+0.40\cdot\frac{1}{1+\bar{V}_{\text{mix}}/0.12}`$ |
+| $`T`$ Trend confirmation | 10% | $`0.65A+0.35U`$ |
+| $`E`$ Evidence factor | × | $`0.80+0.20\min\left(1,\frac{n_{\text{valid}}}{w-1}\right)`$, where $`w`$ is the selected week |
 
 Where:
 
-- $`\sigma_{\text{PPR}}`$: Standard deviation of fantasy points
-- $`\mu_{\text{PPR}}`$: Average fantasy points
+- $`CV_p=\sigma_p/\max(|\bar{p}_{\text{season}}|,2)`$: variation in PPR points across the player's valid games
+- $`\bar{V}_{\text{mix}}=0.65\bar{V}_{\text{recent}}+0.35\bar{V}_{\text{season}}`$: weekly volatility from the Player Consistency Model, weighted toward recent weeks
+- $`A=\frac{1+(0.5\tau_p+0.3\tau_o+0.2\tau_s)}{2}`$: how strongly the three trends agree
+- $`U`$: share of recent games with PPR above the previous average and snap or opportunity share above it too
 
-Lower fantasy-point variation generally produces higher stability.
+The median term keeps one big game from dominating $`F`$. Only upward confirmation adds to $`T`$, so a steady decline is not rewarded.
 
-### Offensive Usage Stability
+### Waiver Flags
 
-Usage stability incorporates the weekly volatility calculated by Model 1.
+Every scored player receives exactly one of four flags. Usage rising means the snap or opportunity share trend is at least +0.10 (falling: −0.10 or lower). Fantasy rising means the PPR trend is at least +0.20 (falling: −0.20 or lower).
 
-```math
-V_{\text{combined}}=
-0.65V_{\text{recent}}+
-0.35V_{\text{season}}
-```
+| Flag | Qualifies when |
+|---|---|
+| 🟢 Must Pick Up | Fantasy and usage rising, at least 67% of recent games confirm the rise, waiver score ≥ 72, recent PPR ≥ 85% of the position benchmark, 5+ valid games |
+| 🔵 Slow Riser | Fantasy and usage rising with at least 50% of recent games confirming and score ≥ 52, **or** usage rising with the PPR trend above −0.30 while recent PPR is still below the benchmark, **or** mixed signals that lean upward |
+| 🟠 Slow Drop | Fantasy and usage falling with at least 50% of recent games confirming the drop, **or** mixed signals that lean downward |
+| 🔴 Must Drop | Fantasy and usage falling, at least 67% of recent games confirm the drop, waiver score ≤ 43, recent PPR under 60% of the benchmark |
 
-```math
-U_{\text{stability}}=
-\frac{1}{
-1+\frac{V_{\text{combined}}}{0.12}
-}
-```
+Mixed signals use a direction score, $`d=0.5\tau_p+0.3\tau_o+0.2\tau_s`$: Slow Riser if $`d>0.05`$, Slow Drop if $`d<-0.05`$, and otherwise Slow Riser only if recent PPR is at or above the benchmark. The rules are in `classify_waiver_scenario` and `conservative_waiver_flag` in `app.py`.
 
-Recent volatility receives greater weight because recent offensive usage is more relevant to current roster decisions.
+### Limited History
 
-### Combined Stability Score
+A full history means at least 4 valid games, covering at least 75% of the games played, with 2+ games before the recent window. Players with less are still scored, using a recent window of 1–2 games and only the metrics they have. Their evidence factor is stricter, $`(0.75+0.25\min(n/5,1))(0.80+0.20c)`$, where $`c`$ is the share of non-missing values. They never receive Must Pick Up or Must Drop.
 
-```math
-V=
-0.60F_{\text{stability}}+
-0.40U_{\text{stability}}
-```
-
-This score contributes 15% of the overall waiver opportunity score.
-
-### Waiver Categories
-
-Model 2 assigns players to recommendation categories based on their scores and trends.
-
-- Must Pick Up
-- Slow Riser
-- Slow Drop
-- Must Drop
-- Stable / No Clear Signal
-- Insufficient Data
-
-These classifications are analytical indicators, not guaranteed predictions of future performance.
+These flags are analytical indicators, not guaranteed predictions of future performance.
 
 ## 8. Repository Structure
 
@@ -391,7 +382,7 @@ RosterWatch/
 │   └── codeReviewer.md            # code review guidelines
 ├── frontend/
 │   ├── streamlit_app/
-│   │   └── app.py                 # Streamlit dashboard (Model 1 and Model 2)
+│   │   └── app.py                 # Streamlit dashboard (both models)
 │   └── README.md
 ├── infra/
 │   └── README.md                  # placeholder for deployment
@@ -400,7 +391,7 @@ RosterWatch/
 │   └── usage_models.py            # earlier usage scoring prototype
 ├── notebooks/
 │   ├── README.md
-│   ├── espn_ownership.csv         # ESPN % rostered snapshot
+│   ├── espn_ownership.csv         # ESPN % rostered snapshot (Waiver Wire Alerts filter)
 │   ├── weekly_usage.csv           # weekly usage data (CSV)
 │   ├── weekly_usage.ipynb         # data pull and cleaning
 │   └── weekly_usage.parquet       # weekly usage data (Parquet)
@@ -472,21 +463,23 @@ The dashboard and the notebook do not need any environment variables or API keys
 
 ### Prepare the Dataset
 
-Copy the data from `notebooks/` into `data/processed/`, where the dashboard looks for it.
+Copy the usage data and the ESPN ownership snapshot from `notebooks/` into `data/processed/`, where the dashboard looks for them.
 
 macOS/Linux:
 
 ```bash
 mkdir -p data/processed
-cp notebooks/weekly_usage.parquet data/processed/
+cp notebooks/weekly_usage.parquet notebooks/espn_ownership.csv data/processed/
 ```
 
 Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force data/processed
-Copy-Item notebooks/weekly_usage.parquet data/processed/
+Copy-Item notebooks/weekly_usage.parquet, notebooks/espn_ownership.csv data/processed/
 ```
+
+Waiver Wire Alerts only show players for a season that has ownership rows in `espn_ownership.csv` (see Data Location in Section 5).
 
 ### Refresh the Data (Optional)
 
@@ -514,21 +507,23 @@ Open that address in your browser.
 
 ## 10. Using the Dashboard
 
-### Model 1
+### Player Consistency Model
 
-1. Select the NFL season and position.
+1. Select the NFL season and position in the sidebar (Control Center).
 2. Choose the desired week range.
-3. Explore player usage charts.
-4. Review volatility and consistency rankings.
+3. Explore player usage charts in the Player Explorer.
+4. Review the Most Volatile and Most Consistent rankings.
 5. Compare how player involvement changes over time.
 
-### Model 2
+### Waiver Wire Alerts
 
-1. Select the NFL season and position.
-2. Choose the evaluation week.
-3. Review waiver opportunity scores.
-4. Filter players by recommendation category.
-5. Inspect fantasy production, usage trends, and model components.
+1. Select the NFL season and position in the sidebar.
+2. Choose the week to analyze through.
+3. Review the Weekly Waiver Rankings: flag, waiver score, % rostered, recent and season PPR, PPR trend, and volatility.
+4. Filter players by waiver flag.
+5. Pick a player in the Player Waiver Trend Explorer to see their fantasy production and usage trends.
+
+The "How players qualify for each waiver flag" panel on the dashboard lists the flag rules from Section 7.
 
 ## 11. Results & Evaluation
 
@@ -539,20 +534,29 @@ RosterWatch produces interpretable player-level analytics, including:
 - Offensive usage trends
 - Fantasy scoring trends
 - Waiver opportunity rankings
-- Recommendation categories
+- Waiver flags
 
 These outputs are descriptive and heuristic.
 
-Before presenting claims about predictive accuracy, the models should be evaluated against historical outcomes using appropriate time-based validation.
+### Player Consistency Model Backtest
 
-Recommended evaluation approaches include:
+A backtest on 2022–2025 asked whether a player's average volatility so far (after 4+ games, 35%+ snaps) separated players who lost 15+ points of snap share in two of their next three games from those who did not. The current formula scores 0.55 on 2022–2024 and 0.53 on 2025, where 0.50 is a coin flip. Volatility describes how stable a role has been; on its own it is a weak warning of a coming role loss.
 
-- Comparing waiver rankings against subsequent fantasy production.
-- Measuring whether rising-player classifications correspond to future increases in usage.
-- Comparing the waiver model against a fantasy-points-only baseline.
-- Testing the sensitivity of rankings to model weights and thresholds.
+### Waiver Wire Alerts Backtest
 
-Actual evaluation results, charts, and case studies should be added after running these analyses.
+Every player was scored as of each of Weeks 5–15 in 2022–2025 (44 analysis weeks, 15,406 player-weeks with three later games). A flag counts as a hit if the player then averaged starter-level points over their next three games: at least the per-game average of the RB24, WR36, or TE12 in 2022–2024 (9.9, 7.7, and 5.8 points in nflverse standard scoring). The waiver-pool columns keep only players scoring under 75% of that level, as a stand-in for availability, because % rostered history does not exist for past seasons.
+
+| Flag | All players: flags/week | All players: hit rate | Waiver pool: flags/week | Waiver pool: hit rate |
+|---|---:|---:|---:|---:|
+| Must Pick Up | 20.3 | 47% | 5.8 | 23% |
+| Slow Riser | 149.7 | 19% | 110.4 | 7% |
+| Slow Drop | 158.2 | 17% | 115.0 | 5% |
+| Must Drop | 22.0 | 9% | 19.8 | 6% |
+| Any flag (base rate) | 350.1 | 19% | 250.9 | 7% |
+
+Must Pick Up hits at about 2.5 times the base rate among all players and over 3 times in the waiver pool. Must Drop hits at half the base rate among all players and slightly below it in the waiver pool. Slow Riser and Slow Drop hit at about the base rate, so they describe direction rather than predict a breakout. Case studies and the full method are in the project design document.
+
+Further evaluation could compare the waiver score against a fantasy-points-only baseline and test how sensitive the rankings are to the weights and thresholds.
 
 ## 12. Testing
 
@@ -567,7 +571,7 @@ Current tests:
 - `tests/test_usage_models.py`: checks the earlier usage scoring prototype in `models/usage_models.py`.
 - `tests/test_example.py`: checks the project template example in `src/`.
 
-The dashboard's Model 1 and Model 2 calculations in `frontend/streamlit_app/app.py` are not covered by automated tests yet.
+The dashboard's Player Consistency Model and Waiver Wire Alerts calculations in `frontend/streamlit_app/app.py` are not covered by automated tests yet.
 
 Recommended additional test coverage includes:
 
@@ -590,7 +594,7 @@ RosterWatch has several limitations:
 3. Injuries, trades, coaching changes, and opponent matchups may affect outcomes.
 4. Missing or incomplete player data can reduce scoring reliability.
 5. Fantasy scoring can be influenced by touchdowns and other high-variance events.
-6. Waiver recommendations do not automatically account for league-specific roster availability.
+6. The ownership filter uses one ESPN-wide % rostered snapshot, not your league's rosters or week-by-week ownership history.
 7. Model scores should not be interpreted as calibrated probabilities.
 
 These limitations provide opportunities for further research and improvement.
@@ -602,10 +606,10 @@ Potential extensions include:
 - Incorporating injury reports and depth-chart changes.
 - Adding matchup and defensive-strength features.
 - Developing machine-learning models for future fantasy production.
-- Evaluating model performance using historical backtesting.
+- Collecting weekly % rostered history so the ownership filter can be backtested.
 - Supporting additional fantasy scoring formats.
 - Adding customizable league settings.
-- Deploying a publicly accessible dashboard.
+- Finishing the public deployment of the dashboard on Google Cloud Run.
 - Improving player comparisons and interactive visualizations.
 
 ## 15. Team Contributions

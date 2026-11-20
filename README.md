@@ -273,7 +273,7 @@ Where:
 
 - $`C`$: Consistency, one minus the volatility percentile rank
 - $`S_{\text{rank}}`$: Average snap-share percentile rank
-- $`O_{\text{rank}}`$: Average opportunity-share percentile rank
+- $`O_{\text{rank}}`$: Average opportunities (carries + targets) per game percentile rank
 
 Ranks are calculated among eligible players in the same season and position.
 

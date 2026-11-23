@@ -1,11 +1,13 @@
-"""Download RosterWatch tables from BigQuery into data/processed/ before the app starts.
+"""Download RosterWatch tables from BigQuery into a folder the Streamlit app reads.
 
+Normally this runs once per build (infra/cloudbuild.yaml), and the data is baked into the image
+so cold starts skip it. If the image has no data, the container runs it at startup instead.
 The Streamlit app already looks in data/processed/ first, so app.py needs no changes.
-Locally you can still drop the files there by hand; this script is only used in the container.
 
 Env vars:
   RW_BQ_PROJECT  GCP project id (defaults to the client's default project)
   RW_BQ_DATASET  dataset name (default: rosterwatch)
+  RW_OUT_DIR     output folder (default: data/processed under the repo root)
 """
 import os
 import sys
@@ -14,7 +16,7 @@ from pathlib import Path
 from google.cloud import bigquery
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "data" / "processed"
+OUT = Path(os.environ.get("RW_OUT_DIR") or ROOT / "data" / "processed")
 DATASET = os.environ.get("RW_BQ_DATASET", "rosterwatch")
 
 

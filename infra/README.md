@@ -77,7 +77,7 @@ The goal is to stay inside the free tier.
 - `--max-instances 1`: traffic spikes cannot scale costs up.
 - The budget `rosterwatch-spend-cap` pauses Cloud Run if it reaches $2 in a month. The budget `rosterwatch-cap` emails at $3 across the project.
 - The data is about 4 MB, so BigQuery storage and queries stay within the free tier.
-- Each build adds an image to Artifact Registry (free up to 0.5 GB). Delete old images now and then, or add a cleanup policy that keeps the newest few.
+- Each build adds an image to Artifact Registry (free up to 0.5 GB). A cleanup policy on the `cloud-run-source-deploy` repo keeps the 3 newest images and deletes older ones (it runs about once a day), so you can roll back up to 2 builds.
 
 Do not raise these limits without checking with the project owner.
 

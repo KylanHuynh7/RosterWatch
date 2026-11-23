@@ -1,0 +1,51 @@
+# Build and deploy RosterWatch (from the repo root):
+#   gcloud builds submit --config infra/cloudbuild.yaml --region us-central1 \
+#     --gcs-source-staging-dir gs://run-sources-rosterwatch-ds3-fall2026-us-central1/cloudbuild-source
+# (staging in the us-central1 bucket keeps storage inside the free tier)
+# 1. pull the BigQuery tables into build_data/  2. build the image with the data baked in
+# 3. push it  4. roll it out to Cloud Run
+substitutions:
+  _REGION: us-central1
+  _SERVICE: rosterwatch
+  _IMAGE: us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/rosterwatch:${BUILD_ID}
+
+steps:
+  - id: fetch-data
+    name: python:3.12-slim
+    entrypoint: bash
+    env:
+      - RW_BQ_PROJECT=${PROJECT_ID}
+      - RW_OUT_DIR=/workspace/build_data
+    args:
+      - -c
+      - pip install -q --no-cache-dir -r infra/requirements-app.txt && python infra/fetch_data.py
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args: [build, -t, "${_IMAGE}", .]
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: [push, "${_IMAGE}"]
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}
+      - --region=${_REGION}
+      - --service-account=rosterwatch-run@${PROJECT_ID}.iam.gserviceaccount.com
+      - --min-instances=0
+      - --max-instances=1
+      - --memory=1Gi
+      - --cpu=1
+      - --cpu-boost
+      - --set-env-vars=RW_BQ_PROJECT=${PROJECT_ID}
+
+images: ["${_IMAGE}"]
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamic_substitutions: true

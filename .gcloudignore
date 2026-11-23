@@ -1,0 +1,13 @@
+# Files gcloud skips when uploading source for `gcloud run deploy --source .`
+# Only the Dockerfile, infra/ and frontend/ are needed to build the image.
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+notebooks/
+data/
+results/
+models/
+tests/
+docs/
+*.md

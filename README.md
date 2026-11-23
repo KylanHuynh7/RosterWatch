@@ -194,7 +194,9 @@ data/processed/espn_ownership.csv
 
 `data/` is listed in `.gitignore`, so this folder is not part of the repository. Copy the files there before launching the dashboard (see Section 9). If `espn_ownership.csv` is missing, the Player Consistency Model still loads but Waiver Wire Alerts stop with an error.
 
-The dashboard keeps ownership rows for the 2022–2025 seasons only, matched to the selected season through `ownership_season`. The snapshot currently in `notebooks/` is labeled `ownership_season` 2026, so Waiver Wire Alerts show no players until an ownership file for 2022–2025 is added.
+The dashboard keeps ownership rows for the 2022–2025 seasons only, matched to the selected season through `ownership_season`. `notebooks/espn_ownership.csv` holds one ESPN % rostered value per player per season for 2022–2025 (`ownership_scope = season_reference_not_weekly`); it is a season-level reference, not weekly ownership history.
+
+The hosted version on Google Cloud Run reads the same files from BigQuery. See [`infra/README.md`](infra/README.md).
 
 ## 6. Player Consistency Model (Weekly Usage Volatility)
 
@@ -609,7 +611,6 @@ Potential extensions include:
 - Collecting weekly % rostered history so the ownership filter can be backtested.
 - Supporting additional fantasy scoring formats.
 - Adding customizable league settings.
-- Finishing the public deployment of the dashboard on Google Cloud Run.
 - Improving player comparisons and interactive visualizations.
 
 ## 15. Team Contributions

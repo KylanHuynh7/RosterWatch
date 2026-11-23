@@ -182,6 +182,7 @@ WAIVER_FLAGS = [
 
 
 
+
 FLAG_ORDER = {
 
     flag: index
@@ -3209,9 +3210,9 @@ st.html("""
 
     <div class="pills">
 
-        <span class="pill">Model 1 · Volatility</span>
+        <span class="pill">Player Consistency Model</span>
 
-        <span class="pill">Model 2 · Fantasy Waiver Score</span>
+        <span class="pill">Waiver Wire Alerts</span>
 
         <span class="pill">Four Waiver Flags</span>
 
@@ -3273,7 +3274,7 @@ st.sidebar.divider()
 
 
 
-st.sidebar.markdown("**Model 1**")
+st.sidebar.markdown("**Player Consistency Model**")
 
 st.sidebar.caption(
 
@@ -3283,7 +3284,7 @@ st.sidebar.caption(
 
 
 
-st.sidebar.markdown("**Model 2**")
+st.sidebar.markdown("**Waiver Wire Alerts**")
 
 st.sidebar.caption(
 
@@ -3309,7 +3310,7 @@ st.divider()
 
 st.header(
 
-    "Model 1 — Weekly Usage Volatility"
+    "Player Consistency Model — Weekly Usage Volatility"
 
 )
 
@@ -3317,7 +3318,7 @@ st.header(
 
 model1_weeks = st.slider(
 
-    "Select Model 1 Week Range",
+    "Select Player Consistency Model Week Range",
 
     min_value=1,
 
@@ -3487,7 +3488,7 @@ st.write(
 
 st.write(
 
-    "**Model 1** measures week-to-week changes "
+    "**Player Consistency Model** measures week-to-week changes "
 
     "in offensive involvement."
 
@@ -3497,7 +3498,7 @@ st.write(
 
 st.write(
 
-    "**Model 2** prioritizes PPR fantasy points "
+    "**Waiver Wire Alerts** prioritize PPR fantasy points "
 
     "while evaluating snap share, opportunity "
 
@@ -3507,7 +3508,7 @@ st.write(
 
 
 
-st.write("**Model 2:** Every eligible player is assigned one of four waiver flags; Model 1 consistency does not override the classification.")
+st.write("**Waiver Wire Alerts:** Every eligible player is assigned one of four waiver flags; Player Consistency Model rankings do not override the classification.")
 
 
 
@@ -3533,7 +3534,7 @@ with st.expander(
 
     st.subheader(
 
-        "Model 1 — Weekly Volatility"
+        "Player Consistency Model — Weekly Volatility"
 
     )
 
@@ -3601,17 +3602,35 @@ with st.expander(
 
         r"\bar{V}="
 
-        r"**\f**rac{1}{m}"
+        r"\frac{1}{m}"
 
-        r"\sum_{t**\i**n T}V_t"
+        r"\sum_{t\in T}V_t"
 
+    )
+
+    st.write(
+        "T = the weeks in the selected range with a valid comparison "
+        "(the player also played the week before, and all four shares exist in both games); "
+        "m = the number of those weeks."
+    )
+
+    st.latex(
+        r"Q=100\left(0.50\,C+0.25\,S_{\text{rank}}+0.25\,O_{\text{rank}}\right),"
+        r"\qquad C=1-\operatorname{pct}(\bar{V})"
+    )
+
+    st.write(
+        "**Q** is the consistency quality score used to sort the Most Consistent table. "
+        "C, S_rank and O_rank are percentile ranks (0–1) among consistency-eligible players "
+        "at the same position and season: lower average volatility, higher average snap share "
+        "and more carries + targets per game rank higher."
     )
 
 
 
     st.subheader(
 
-        "Model 2 — Fantasy Waiver Opportunity"
+        "Waiver Wire Alerts — Fantasy Waiver Opportunity"
 
     )
 
@@ -3619,17 +3638,19 @@ with st.expander(
 
     st.latex(
 
-        r"W_t=100("
+        r"W=100("
 
-        r"0.40F_t"
+        r"0.40F"
 
-        r"+0.20O_t"
+        r"+0.20O"
 
-        r"+0.15S_t"
+        r"+0.15S"
 
-        r"+0.15V_t"
+        r"+0.15V"
 
-        r"+0.10T_t)"
+        r"+0.10T)"
+
+        r"\times E"
 
     )
 
@@ -3671,6 +3692,12 @@ with st.expander(
 
         "**T:** Trend confirmation."
 
+    )
+
+    st.write(
+        "**E:** Evidence factor, 0.80 + 0.20 × min(1, valid games ÷ (week − 1)). "
+        "It lowers the score for players with few valid games; players with a "
+        "limited history use a stricter version."
     )
 
 
@@ -3753,7 +3780,7 @@ with st.expander(
 
 
 
-    st.info("Model 2 uses heuristic benchmarks and four directional waiver flags. Ownership is based on the ESPN snapshot, not verified historical weekly availability.")
+    st.info("Waiver Wire Alerts use heuristic benchmarks and four directional waiver flags. Ownership is based on the ESPN snapshot, not verified historical weekly availability.")
 
 
 
@@ -3779,7 +3806,7 @@ st.caption(
 
     f"{season} Season | "
 
-    f"Model 1 Weeks "
+    f"Player Consistency Model Weeks "
 
     f"{model1_weeks[0]}–"
 
@@ -4227,7 +4254,7 @@ st.divider()
 
 st.header(
 
-    "Model 1 — Player Volatility Rankings"
+    "Player Consistency Model — Player Volatility Rankings"
 
 )
 
@@ -4543,7 +4570,7 @@ st.divider()
 
 st.header(
 
-    "Model 2 — Fantasy Waiver Opportunity"
+    "Waiver Wire Alerts — Fantasy Waiver Opportunity"
 
 )
 
@@ -4551,7 +4578,7 @@ st.header(
 
 st.write(
 
-    "Model 2 prioritizes fantasy PPR production "
+    "Waiver Wire Alerts prioritize fantasy PPR production "
 
     "while analyzing offensive snap share, "
 
@@ -4563,7 +4590,29 @@ st.write(
 
 
 
-st.write("**Four flags:** Must Pick Up, Slow Riser, Slow Drop, and Must Drop. All ownership-eligible players returned by Model 2 receive one flag.")
+st.write("**Four flags:** Must Pick Up, Slow Riser, Slow Drop, and Must Drop. All ownership-eligible players returned by Waiver Wire Alerts receive one flag.")
+
+with st.expander("How players qualify for each waiver flag"):
+    st.markdown(
+        f"""
+**Who is scored:** players matched to the ESPN snapshot and rostered in at most {MAX_PERCENT_OWNED:g}% of leagues.
+
+**Trends** compare a player's last 2–4 valid games with his earlier games, scaled from −1 to +1.
+*Usage rising* means the snap or opportunity share trend is at least +0.10 (falling: −0.10 or lower).
+*Fantasy rising* means the PPR trend is at least +0.20 (falling: −0.20 or lower).
+
+| Flag | Qualifies when |
+|---|---|
+| 🟢 Must Pick Up | Fantasy and usage rising, at least 67% of recent games confirm the rise, waiver score ≥ 72, recent PPR ≥ 85% of the position benchmark, 5+ valid games |
+| 🔵 Slow Riser | Fantasy and usage rising with at least 50% of recent games confirming and score ≥ 52, **or** usage rising with the PPR trend above −0.30 while recent PPR is still below the benchmark, **or** mixed signals that lean upward |
+| 🟠 Slow Drop | Fantasy and usage falling with at least 50% of recent games confirming the drop, **or** mixed signals that lean downward |
+| 🔴 Must Drop | Fantasy and usage falling, at least 67% of recent games confirm the drop, waiver score ≤ 43, recent PPR under 60% of the benchmark |
+
+**Full history** means at least 4 valid games, covering at least 75% of the games he played, with 2+ games before the recent window.
+Players with less are scored on the data they have and never receive Must Pick Up or Must Drop.
+Position benchmarks (PPR points, snap share, opportunity share) are listed in the model explanation above.
+"""
+    )
 
 
 
@@ -4665,14 +4714,14 @@ all_waiver_results = all_waiver_results.loc[
 ].reset_index(drop=True)
 
 st.caption(
-    f"Model 2 ownership limit: ≤ {MAX_PERCENT_OWNED:g}% | "
+    f"Waiver Wire Alerts ownership limit: ≤ {MAX_PERCENT_OWNED:g}% | "
     f"{len(all_waiver_results)} eligible players | "
     f"Weekly source: {model2_source.relative_to(ROOT)}. "
     "Ownership is a collected snapshot, not historical weekly ownership."
 )
 if all_waiver_results.empty:
     st.warning(
-        "No eligible Model 2 players for this selection. "
+        "No eligible Waiver Wire Alerts players for this selection. "
         f"Season {season}, through Week {selected_week}; "
         f"{len(season_ownership)} ownership-eligible IDs. "
         "Available source matches: " + "; ".join(source_diagnostics)
@@ -5398,7 +5447,7 @@ else:
 
     st.info(
 
-        "No players available for Model 2 "
+        "No players available for Waiver Wire Alerts "
 
         "at this season, position, and week."
 
@@ -5430,9 +5479,9 @@ st.markdown(
 
 st.caption(
 
-    "Model 1: Weekly Usage Volatility | "
+    "Player Consistency Model: Weekly Usage Volatility | "
 
-    "Model 2: Fantasy PPR Waiver Opportunity"
+    "Waiver Wire Alerts: Fantasy PPR Waiver Opportunity"
 
 )
 

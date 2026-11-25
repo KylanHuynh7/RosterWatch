@@ -509,10 +509,12 @@ Open that address in your browser.
 
 ## 10. Using the Dashboard
 
+The page has three tabs: **About RosterWatch** (what the tool does and both models' equations), **Player Consistency Model** and **Waiver Wire Alerts**. The sidebar filters apply to every tab.
+
 ### Player Consistency Model
 
 1. Select the NFL season and position in the sidebar (Control Center).
-2. Choose the desired week range.
+2. Open the Player Consistency Model tab and choose the desired week range.
 3. Explore player usage charts in the Player Explorer.
 4. Review the Most Volatile and Most Consistent rankings.
 5. Compare how player involvement changes over time.
@@ -520,12 +522,12 @@ Open that address in your browser.
 ### Waiver Wire Alerts
 
 1. Select the NFL season and position in the sidebar.
-2. Choose the week to analyze through.
+2. Open the Waiver Wire Alerts tab and choose the week to analyze through.
 3. Review the Weekly Waiver Rankings: flag, waiver score, % rostered, recent and season PPR, PPR trend, and volatility.
 4. Filter players by waiver flag.
 5. Pick a player in the Player Waiver Trend Explorer to see their fantasy production and usage trends.
 
-The "How players qualify for each waiver flag" panel on the dashboard lists the flag rules from Section 7.
+The "How players qualify for each waiver flag" panel on the Waiver Wire Alerts tab lists the flag rules from Section 7.
 
 ## 11. Results & Evaluation
 

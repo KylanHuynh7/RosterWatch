@@ -6,6 +6,9 @@ RosterWatch is an interactive NFL analytics dashboard built with Python and Stre
 
 The dashboard focuses on three offensive positions: running backs (RB), wide receivers (WR), and tight ends (TE), using historical NFL data from the 2022–2025 seasons.
 
+- **Live site:** https://rosterwatch-313397944060.us-central1.run.app
+- **Design document:** [docs/RosterWatch_Design_Doc.pdf](docs/RosterWatch_Design_Doc.pdf)
+
 ## 1. Problem Statement & Motivation
 
 Fantasy football managers often make roster decisions based on recent fantasy points alone. However, fantasy production does not always reflect a player's underlying offensive involvement.
@@ -65,7 +68,7 @@ All libraries are listed in `requirements.txt`.
 
 | Library | Used in | Link |
 |---|---|---|
-| pandas | notebook, dashboard, models, tests | https://pandas.pydata.org/ |
+| pandas | notebook, dashboard, models, backtests, tests | https://pandas.pydata.org/ |
 | NumPy | notebook, dashboard | https://numpy.org/ |
 | nflreadpy | notebook (data pull) | https://github.com/nflverse/nflreadpy |
 | Requests | notebook (Sleeper API) | https://requests.readthedocs.io/ |
@@ -78,8 +81,8 @@ All libraries are listed in `requirements.txt`.
 | seaborn | listed in requirements, not used yet | https://seaborn.pydata.org/ |
 | scikit-learn | listed in requirements, not used yet | https://scikit-learn.org/ |
 | python-dotenv | listed in requirements, not used yet | https://github.com/theskumar/python-dotenv |
-| google-cloud-bigquery | listed in requirements, not used yet | https://cloud.google.com/python/docs/reference/bigquery/latest |
-| db-dtypes | listed in requirements, not used yet | https://github.com/googleapis/python-db-dtypes-pandas |
+| google-cloud-bigquery | hosting: `infra/fetch_data.py` copies the BigQuery tables | https://cloud.google.com/python/docs/reference/bigquery/latest |
+| db-dtypes | hosting: lets google-cloud-bigquery return pandas tables | https://github.com/googleapis/python-db-dtypes-pandas |
 
 The notebook also uses Python's standard library (`json`, `math`, `datetime`, `pathlib`, `urllib.request`) for the ESPN request.
 
@@ -382,15 +385,19 @@ These flags are analytical indicators, not guaranteed predictions of future perf
 RosterWatch/
 ├── .streamlit/
 │   └── config.toml                # dark theme for the dashboard
+├── analysis/
+│   ├── backtest_consistency.py    # Player Consistency Model backtest (Section 11)
+│   └── backtest_waiver.py         # Waiver Wire Alerts backtest (Section 11)
 ├── build_data/                    # filled by the Cloud Build step
 ├── docs/
 │   ├── AGENTS.md                  # guidelines for AI coding agents
 │   ├── DesignDoc.md               # design document template
+│   ├── RosterWatch_Design_Doc.pdf # the project design document
 │   └── codeReviewer.md            # code review guidelines
 ├── frontend/
 │   ├── streamlit_app/
 │   │   └── app.py                 # Streamlit dashboard: tabs, charts, tables and controls
-│   └── README.md
+│   └── README.md                  # how the dashboard is organized and run
 ├── infra/
 │   ├── README.md                  # deployment and hosting notes
 │   ├── cloudbuild.yaml            # fetch data from BigQuery -> build -> deploy to Cloud Run
@@ -423,7 +430,7 @@ RosterWatch/
 │   ├── test_example.py
 │   └── test_usage_models.py
 ├── .dockerignore / .gcloudignore  # keep notebooks and local files out of the image
-├── .env.example
+├── .env.example                   # optional hosting settings (Section 9)
 ├── .gitignore
 ├── Dockerfile                     # container image for Cloud Run
 ├── README.md
@@ -476,9 +483,17 @@ This installs everything in Section 3, including Streamlit, Plotly, nflreadpy an
 
 ### Environment Configuration
 
-The dashboard and the notebook do not need any environment variables or API keys.
+Running the dashboard, the notebook or the backtests locally needs no environment variables or API keys.
 
-`.env.example` is a template from the project starter. If a future pipeline needs settings, copy it to `.env` and fill in your own values. `.env` is listed in `.gitignore`; never commit passwords, API keys, or other secrets.
+Only the hosting scripts in `infra/` read settings, all optional. They are listed in `.env.example`. The scripts read them from your shell (for example `export RW_BQ_PROJECT=rosterwatch-ds3-fall2026`); nothing loads `.env` automatically.
+
+| Variable | Used by | Default |
+|---|---|---|
+| `RW_BQ_PROJECT` | `infra/load_bigquery.sh`, `infra/fetch_data.py` | `rosterwatch-ds3-fall2026` in `load_bigquery.sh`; your `gcloud` default project in `fetch_data.py` |
+| `RW_BQ_DATASET` | `infra/load_bigquery.sh`, `infra/fetch_data.py` | `rosterwatch` |
+| `RW_OUT_DIR` | `infra/fetch_data.py` | `data/processed/` |
+
+`.env` is listed in `.gitignore`; never commit passwords, API keys, or other secrets.
 
 ### Prepare the Dataset
 
@@ -523,6 +538,25 @@ http://localhost:8501
 ```
 
 Open that address in your browser.
+
+### Deploy the Hosted Site
+
+The live site runs on Google Cloud Run, with the data copied in from BigQuery when the image is built. This needs access to the Google Cloud project and the `gcloud` CLI signed in. Full details (costs, cold starts, the warm-up job) are in [`infra/README.md`](infra/README.md).
+
+1. If the data changed, run the notebook, commit the new files in `notebooks/`, then reload BigQuery:
+
+   ```bash
+   bash infra/load_bigquery.sh
+   ```
+
+2. Build and deploy from the repository root, on the branch you want live (about 3 minutes):
+
+   ```bash
+   gcloud builds submit --config infra/cloudbuild.yaml --region us-central1 \
+     --gcs-source-staging-dir gs://run-sources-rosterwatch-ds3-fall2026-us-central1/cloudbuild-source
+   ```
+
+Cloud Build copies both BigQuery tables into the image, builds it from the `Dockerfile` and deploys it to the `rosterwatch` service in `us-central1`. The live app reads the copied files and does not query BigQuery while in use. If a build or start fails, Cloud Run keeps serving the previous version.
 
 ## 10. Using the Dashboard
 
@@ -573,11 +607,22 @@ Every player was scored as of each of Weeks 5–15 in 2022–2025 (44 analysis w
 | Slow Riser | 149.7 | 19% | 110.4 | 7% |
 | Slow Drop | 158.2 | 17% | 115.0 | 5% |
 | Must Drop | 22.0 | 9% | 19.8 | 6% |
-| Any flag (base rate) | 350.1 | 19% | 250.9 | 7% |
+| Any flag (base rate) | 350.1 | 19% | 250.9 | 6% |
 
 Must Pick Up hits at about 2.5 times the base rate among all players and over 3 times in the waiver pool. Must Drop hits at half the base rate among all players and slightly below it in the waiver pool. Slow Riser and Slow Drop hit at about the base rate, so they describe direction rather than predict a breakout. Case studies and the full method are in the project design document.
 
 Further evaluation could compare the waiver score against a fantasy-points-only baseline and test how sensitive the rankings are to the weights and thresholds.
+
+### Reproduce These Results
+
+Both backtests are scripts in `analysis/`. They import the models from `src/rosterwatch/` and read `notebooks/weekly_usage.parquet`, so they need only the setup in Section 9 (no `data/processed/` copy). Run them from the repository root:
+
+```bash
+python analysis/backtest_consistency.py   # Player Consistency Model: snap-loss and touch-loss AUC (a few seconds)
+python analysis/backtest_waiver.py        # Waiver Wire Alerts: the hit-rate table above (about 30 seconds)
+```
+
+The waiver script also prints the share of Must Pick Up flags that went to players already at starter level (72%) and the waiver-pool Must Pick Up hit rate for 2022–2024 (22%) and 2025 (26%).
 
 ## 12. Testing
 
@@ -619,6 +664,16 @@ RosterWatch has several limitations:
 7. Model scores should not be interpreted as calibrated probabilities.
 
 These limitations provide opportunities for further research and improvement.
+
+### Known Issues
+
+- **Missing fantasy points.** Sleeper has no PPR score for about a quarter of player-games (25.7%), mostly games with no carry or target. Those games are not valid games for Waiver Wire Alerts, so a player with many of them is scored by the limited-history path (Section 7).
+- **Season-level ownership.** ESPN % rostered is one value per player per season, collected after the fact, so the ≤ 50% filter reflects later ownership rather than the selected week. For the same reason the backtest cannot apply it.
+- **Slow Riser and Slow Drop are broad.** Together they cover most flags and hit at about the base rate (Section 11). Treat them as direction labels, not recommendations.
+- **Volatility is a weak warning.** Average volatility separates players who are about to lose snaps only slightly better than chance (AUC 0.55).
+- **Unused benchmark.** The opportunities-per-game benchmark (`"volume"` in `MODEL2_SETTINGS`) is shown on the About tab but not used in the waiver score.
+- **Streamlit deprecation warnings.** The app uses `use_container_width`, which newer Streamlit versions report as deprecated in the server log; the page is unaffected.
+- **Cold starts.** When the hosted site has had no visitors for a while, the first load takes about 4–5 seconds while Cloud Run starts the container.
 
 ## 14. Future Improvements
 

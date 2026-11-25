@@ -1,8 +1,14 @@
 # Frontend
 
-This folder is for the UI/UX portion of the project. Typical contents may include:
+The dashboard is a single Streamlit script: `streamlit_app/app.py`.
 
-- React, Vue, or plain HTML/CSS/JS code
-- static assets for dashboards or visualizations
-- frontend build configuration
-- a README describing how to run and deploy the web interface
+- **What it draws:** a sidebar (season and position filters) and three tabs: About RosterWatch (both models' equations and settings), Player Consistency Model and Waiver Wire Alerts.
+- **Where the math lives:** the data loader and both models are in `src/rosterwatch/`. `app.py` imports them and caches their results with `st.cache_data`, so changing a filter does not recompute everything.
+- **Data it reads:** `data/processed/weekly_usage.parquet` (or `.csv`) and `data/processed/espn_ownership.csv`. Section 9 of the main README shows how to create them.
+- **Theme:** `.streamlit/config.toml` at the repository root.
+
+Run it from the repository root:
+
+```bash
+streamlit run frontend/streamlit_app/app.py
+```

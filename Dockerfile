@@ -10,6 +10,7 @@ WORKDIR /app
 COPY infra/requirements-app.txt infra/requirements-app.txt
 RUN pip install --no-cache-dir -r infra/requirements-app.txt
 
+COPY .streamlit/ .streamlit/
 COPY frontend/ frontend/
 COPY infra/fetch_data.py infra/fetch_data.py
 COPY build_data/ data/processed/

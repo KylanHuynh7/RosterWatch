@@ -1,0 +1,8 @@
+# Streamlit theme for RosterWatch. Matches the navy palette in app.py's custom CSS, so Streamlit's
+# own elements (top header, widget labels, dropdowns) render dark instead of the default light theme.
+[theme]
+base = "dark"
+backgroundColor = "#08111f"
+secondaryBackgroundColor = "#152841"
+textColor = "#e2e8f0"
+primaryColor = "#ff4b4b"

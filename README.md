@@ -129,6 +129,8 @@ Waiver Wire Alerts incorporate fantasy points alongside offensive usage, stabili
 
 The dashboard uses historical data through the selected week to avoid incorporating future game results into that week's analysis.
 
+The model code is kept separate from the page: `src/rosterwatch/` holds the data loader, both models and their settings, and `frontend/streamlit_app/app.py` imports them, caches their results and draws the page. The models can therefore be imported on their own, for example by tests or analysis scripts.
+
 ## 5. Data Sources & Processing
 
 RosterWatch uses historical weekly NFL player usage data for the 2022–2025 regular seasons (weeks 1–18), built by `notebooks/weekly_usage.ipynb`.
@@ -323,7 +325,7 @@ Each component is kept on a 0–1 scale.
 | WR | 12.0 | 65% | 17% | 6 |
 | TE | 8.0 | 60% | 13% | 4 |
 
-The benchmarks are set in `MODEL2_SETTINGS` in `app.py`. A player at or above a benchmark gets full credit for that part of the score; they are not minimums.
+The benchmarks are set in `MODEL2_SETTINGS` in `src/rosterwatch/settings.py`. A player at or above a benchmark gets full credit for that part of the score; they are not minimums.
 
 ### Trends
 
@@ -366,7 +368,7 @@ Every scored player receives exactly one of four flags. Usage rising means the s
 | 🟠 Slow Drop | Fantasy and usage falling with at least 50% of recent games confirming the drop, **or** mixed signals that lean downward |
 | 🔴 Must Drop | Fantasy and usage falling, at least 67% of recent games confirm the drop, waiver score ≤ 43, recent PPR under 60% of the benchmark |
 
-Mixed signals use a direction score, $`d=0.5\tau_p+0.3\tau_o+0.2\tau_s`$: Slow Riser if $`d>0.05`$, Slow Drop if $`d<-0.05`$, and otherwise Slow Riser only if recent PPR is at or above the benchmark. The rules are in `classify_waiver_scenario` and `conservative_waiver_flag` in `app.py`.
+Mixed signals use a direction score, $`d=0.5\tau_p+0.3\tau_o+0.2\tau_s`$: Slow Riser if $`d>0.05`$, Slow Drop if $`d<-0.05`$, and otherwise Slow Riser only if recent PPR is at or above the benchmark. The rules are in `classify_waiver_scenario` and `conservative_waiver_flag` in `src/rosterwatch/waiver.py`.
 
 ### Limited History
 
@@ -378,16 +380,23 @@ These flags are analytical indicators, not guaranteed predictions of future perf
 
 ```text
 RosterWatch/
+├── .streamlit/
+│   └── config.toml                # dark theme for the dashboard
+├── build_data/                    # filled by the Cloud Build step
 ├── docs/
 │   ├── AGENTS.md                  # guidelines for AI coding agents
 │   ├── DesignDoc.md               # design document template
 │   └── codeReviewer.md            # code review guidelines
 ├── frontend/
 │   ├── streamlit_app/
-│   │   └── app.py                 # Streamlit dashboard (both models)
+│   │   └── app.py                 # Streamlit dashboard: tabs, charts, tables and controls
 │   └── README.md
 ├── infra/
-│   └── README.md                  # placeholder for deployment
+│   ├── README.md                  # deployment and hosting notes
+│   ├── cloudbuild.yaml            # fetch data from BigQuery -> build -> deploy to Cloud Run
+│   ├── fetch_data.py              # copies the BigQuery tables to data/processed/
+│   ├── load_bigquery.sh           # reloads BigQuery from notebooks/
+│   └── requirements-app.txt       # pinned libraries for the container
 ├── models/
 │   ├── .gitkeep
 │   └── usage_models.py            # earlier usage scoring prototype
@@ -403,12 +412,20 @@ RosterWatch/
 │   └── .gitkeep
 ├── src/
 │   ├── __init__.py
-│   └── example.py                 # project template example
+│   ├── example.py                 # project template example
+│   └── rosterwatch/               # the two models, imported by app.py
+│       ├── __init__.py
+│       ├── settings.py            # weights, thresholds and benchmarks for both models
+│       ├── data.py                # loads and validates weekly usage and ESPN % rostered
+│       ├── consistency.py         # Player Consistency Model (weekly usage volatility)
+│       └── waiver.py              # Waiver Wire Alerts (waiver score and flags)
 ├── tests/
 │   ├── test_example.py
 │   └── test_usage_models.py
+├── .dockerignore / .gcloudignore  # keep notebooks and local files out of the image
 ├── .env.example
 ├── .gitignore
+├── Dockerfile                     # container image for Cloud Run
 ├── README.md
 └── requirements.txt
 ```
@@ -575,7 +592,7 @@ Current tests:
 - `tests/test_usage_models.py`: checks the earlier usage scoring prototype in `models/usage_models.py`.
 - `tests/test_example.py`: checks the project template example in `src/`.
 
-The dashboard's Player Consistency Model and Waiver Wire Alerts calculations in `frontend/streamlit_app/app.py` are not covered by automated tests yet.
+The Player Consistency Model and Waiver Wire Alerts calculations in `src/rosterwatch/` are not covered by automated tests yet.
 
 Recommended additional test coverage includes:
 

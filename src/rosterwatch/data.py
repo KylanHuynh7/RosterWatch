@@ -10,6 +10,29 @@ from .settings import MAX_PERCENT_OWNED, POSITIONS
 # DATA LOADING
 # ============================================================
 def load_data(path):
+    """Load the weekly usage table and clean it for both models.
+
+    Reads parquet or CSV and checks the required columns. Adds empty
+    ``fantasy_points_ppr`` / ``opponent`` columns if the file lacks them, converts
+    numbers, keeps RB/WR/TE rows from 2022-2025, Weeks 1-18, that have a player ID,
+    drops duplicate player-weeks (keeping the last) and adds ``opportunities``
+    (targets + carries).
+
+    Parameters
+    ----------
+    path : str
+        Path to ``weekly_usage.parquet`` or ``weekly_usage.csv``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per player-game, sorted by season, player and week.
+
+    Raises
+    ------
+    ValueError
+        If a required column is missing.
+    """
     if path.endswith(".parquet"):
         df = pd.read_parquet(path)
     else:
@@ -72,6 +95,28 @@ def load_data(path):
 
 
 def load_ownership(path):
+    """Load ESPN % rostered: one value per player and season.
+
+    Keeps 2022-2025 rows that have a player ID and a % rostered between 0 and
+    ``MAX_PERCENT_OWNED`` (50), so the result is the Waiver Wire Alerts player
+    pool. If a player-season appears twice, the most recently collected row is
+    kept.
+
+    Parameters
+    ----------
+    path : str
+        Path to ``espn_ownership.csv``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``ownership_season``, ``gsis_id`` and ``percentOwned``.
+
+    Raises
+    ------
+    ValueError
+        If a required column is missing.
+    """
     ownership = pd.read_csv(path, dtype={"gsis_id": "string"})
     required = {"ownership_season", "gsis_id", "percentOwned"}
     missing = required - set(ownership.columns)

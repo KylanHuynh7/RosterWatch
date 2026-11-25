@@ -15,6 +15,28 @@ from .settings import (
 # MODEL 1 — WEEKLY VOLATILITY
 # ============================================================
 def calculate_volatility(data):
+    """Compute each player's weekly usage volatility (V).
+
+    For each player and season, a week's V is the position-weighted sum of the
+    absolute week-to-week changes in snap, opportunity, passing-down and red-zone
+    share (weights in ``POSITION_WEIGHTS``). V is only computed when the player
+    also played the week before and all four shares exist in both games;
+    otherwise it is NaN. A player's weights come from his position in his latest
+    week. Lower V means a steadier role.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Weekly usage rows from ``load_data``, any number of seasons.
+
+    Returns
+    -------
+    weekly : pandas.DataFrame
+        The input rows plus a ``weekly_volatility`` column, grouped by player and
+        sorted by week.
+    summary : pandas.DataFrame
+        ``summarize_model1_window(weekly)`` for the same rows.
+    """
     # Vectorized across all players at once (same results as a per-player loop,
     # about 50x faster). Row order: players in order of first appearance, each
     # player's rows sorted by week.
@@ -60,6 +82,29 @@ def calculate_volatility(data):
 # MODEL 1 — CONSISTENCY SUMMARY
 # ============================================================
 def summarize_model1_window(weekly):
+    """Summarize volatility per player for the selected weeks and score consistency.
+
+    Each player-season gets weeks played, the number of valid week-to-week
+    comparisons, average volatility (``volatility_score``), average snap share
+    and average opportunities per week. A player is ``consistency_eligible`` if
+    he meets his position's minimum weeks, snap share and opportunities
+    (``CONSISTENCY_THRESHOLDS``) and has at least ``MIN_COMPARISONS`` valid
+    comparisons. Eligible players get a ``consistency_quality_score`` (Q) from
+    percentile ranks within season and position:
+    Q = 100 * (0.50 * (1 - volatility rank) + 0.25 * snap rank
+    + 0.25 * opportunity rank).
+
+    Parameters
+    ----------
+    weekly : pandas.DataFrame
+        Rows with ``weekly_volatility`` (from ``calculate_volatility``), already
+        limited to the selected weeks.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per player-season; empty if ``weekly`` is empty.
+    """
     if weekly.empty:
         return pd.DataFrame()
     summary = weekly.groupby(
@@ -89,6 +134,7 @@ def summarize_model1_window(weekly):
     )
 
     def eligible(row):
+        """Return True if the player meets his position's minimums for the Most Consistent table."""
         min_weeks, min_snap, min_volume = CONSISTENCY_THRESHOLDS[row["position"]]
         return bool(
             row["weeks"] >= min_weeks

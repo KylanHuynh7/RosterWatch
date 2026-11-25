@@ -11,6 +11,20 @@ from .settings import MODEL2_SETTINGS, MODEL2_WEIGHTS, WAIVER_FLAGS
 # SHARED HELPERS
 # ============================================================
 def safe_mean(series):
+    """Average of a column, ignoring missing or non-numeric values.
+
+    Returns NaN instead of raising when no values are left. Plain numeric
+    columns take a faster NumPy path with the same result.
+
+    Parameters
+    ----------
+    series : pandas.Series
+
+    Returns
+    -------
+    float
+        The mean, or NaN if there are no valid values.
+    """
     # Fast path for plain float/int columns (called thousands of times per page).
     # sum / count matches pandas' mean for NaN-free float64 data exactly.
     if isinstance(series.dtype, np.dtype) and series.dtype.kind in "fi":
@@ -29,6 +43,7 @@ def safe_mean(series):
 
 
 def clip01(value):
+    """Clamp a number to the range [0, 1]; a missing value becomes 0.0."""
     if pd.isna(value):
         return 0.0
     return float(np.clip(value, 0, 1))
@@ -40,6 +55,25 @@ def normalized_change(
     column,
     scale,
 ):
+    """Trend of one metric: recent average vs. earlier average, scaled to [-1, 1].
+
+    Computes (mean(recent) - mean(previous)) / scale and clips the result, so a
+    change of one ``scale`` or more counts as a full +1 or -1.
+
+    Parameters
+    ----------
+    recent, previous : pandas.DataFrame
+        The player's recent games and the games before them.
+    column : str
+        Metric to compare, e.g. ``"snap_pct"``.
+    scale : float
+        Change that counts as a full +1 / -1.
+
+    Returns
+    -------
+    float
+        The trend in [-1, 1]; 0.0 if either side has no data.
+    """
     current = safe_mean(recent[column])
     baseline = safe_mean(previous[column])
     if pd.isna(current) or pd.isna(baseline):
@@ -62,6 +96,28 @@ def calculate_fantasy_score(
     previous,
     settings,
 ):
+    """Fantasy component F of the waiver score (weight 40%).
+
+    Level = 0.65 * recent average PPR / benchmark + 0.35 * recent median PPR /
+    benchmark (each part capped at 1). Trend = recent vs. earlier PPR, where a
+    change of half the benchmark counts as +/-1.
+    F = 0.75 * level + 0.25 * (0.5 + 0.5 * trend).
+
+    Parameters
+    ----------
+    player : pandas.DataFrame
+        All of the player's valid games so far this season.
+    recent, previous : pandas.DataFrame
+        His recent games and the games before them.
+    settings : dict
+        The position's ``MODEL2_SETTINGS`` entry (uses ``"ppr"``).
+
+    Returns
+    -------
+    dict
+        ``score`` (F, 0-1), ``season_ppr``, ``recent_ppr``, ``recent_median`` and
+        ``trend``.
+    """
     baseline = settings["ppr"]
     season_ppr = safe_mean(player["fantasy_points_ppr"])
     recent_ppr = safe_mean(recent["fantasy_points_ppr"])
@@ -94,6 +150,26 @@ def calculate_usage_scores(
     previous,
     settings,
 ):
+    """Opportunity (O, weight 20%) and snap (S, weight 15%) components of the waiver score.
+
+    Each = 0.80 * recent share / position benchmark (capped at 1)
+    + 0.20 * (0.5 + 0.5 * trend). The trends are scaled so that +0.06
+    opportunity share or +0.10 snap share counts as a full +1.
+
+    Parameters
+    ----------
+    recent, previous : pandas.DataFrame
+        The player's recent games and the games before them.
+    settings : dict
+        The position's ``MODEL2_SETTINGS`` entry (uses ``"snap"`` and ``"opp"``).
+
+    Returns
+    -------
+    dict
+        ``opportunity_score`` and ``snap_score`` (0-1), ``opp_trend`` and
+        ``snap_trend`` (-1 to 1), and the recent averages ``recent_opp`` and
+        ``recent_snap``.
+    """
     snap_trend = normalized_change(
         recent,
         previous,
@@ -130,6 +206,29 @@ def calculate_stability(
     recent,
     season_ppr,
 ):
+    """Stability component V of the waiver score (weight 15%): can the production be trusted?
+
+    Fantasy stability = 1 / (1 + coefficient of variation of PPR), dividing by at
+    least 2 points. Usage stability = 1 / (1 + volatility / 0.12), where
+    volatility blends recent (65%) and season (35%) Player Consistency Model
+    volatility, or is 0.5 if neither exists.
+    Score = 0.60 * fantasy stability + 0.40 * usage stability.
+
+    Parameters
+    ----------
+    player : pandas.DataFrame
+        The player's valid games, with ``weekly_volatility``.
+    recent : pandas.DataFrame
+        His recent games.
+    season_ppr : float
+        His season average PPR.
+
+    Returns
+    -------
+    dict
+        ``score`` (0-1), ``fantasy_stability``, ``usage_stability`` and
+        ``volatility`` (the blended value, also used by the flag rules).
+    """
     ppr_std = float(player["fantasy_points_ppr"].std(ddof=0))
     ppr_cv = ppr_std / max(abs(season_ppr), 2.0)
     fantasy_stability = 1 / (1 + ppr_cv)
@@ -164,6 +263,29 @@ def calculate_trend_confirmation(
     opp_trend,
     snap_trend,
 ):
+    """Trend-confirmation component T of the waiver score (weight 10%).
+
+    Checks whether points and usage move together. A recent game confirms a rise
+    when its PPR is above the earlier average and so is its opportunity or snap
+    share (and the reverse for a drop).
+    Score = 0.65 * (0.5 + 0.5 * weighted trend) + 0.35 * share of recent games
+    confirming a rise, with weighted trend = 0.50 * PPR + 0.30 * opportunity
+    + 0.20 * snap trend.
+
+    Parameters
+    ----------
+    recent, previous : pandas.DataFrame
+        The player's recent games and the games before them.
+    ppr_trend, opp_trend, snap_trend : float
+        Trends from ``normalized_change``, each in [-1, 1].
+
+    Returns
+    -------
+    dict
+        ``score`` (0-1), ``weighted_trend``, ``upward_confirmation`` and
+        ``downward_confirmation`` (share of recent games, 0-1), and
+        ``persistence`` (the confirmation share in the trend's direction).
+    """
     weighted_trend = 0.50 * ppr_trend + 0.30 * opp_trend + 0.20 * snap_trend
     alignment_score = clip01(0.5 + 0.5 * weighted_trend)
     baseline_ppr = safe_mean(previous["fantasy_points_ppr"])
@@ -204,10 +326,31 @@ def conservative_waiver_flag(
     recent_ppr=np.nan,
     baseline=np.nan,
 ):
-    """Choose an existing directional flag when evidence is mixed or sparse.
+    """Choose Slow Riser or Slow Drop when the evidence is mixed or sparse.
 
-    Neutral/mixed cases use Slow Riser or Slow Drop, not a strong action.
-    This is a heuristic classification, not a verified trend.
+    Never returns Must Pick Up or Must Drop. Checks, in order:
+    1. Weighted direction 0.50 * PPR + 0.30 * opportunity + 0.20 * snap trend
+       (missing trends skipped): above +0.05 is Slow Riser, below -0.05 is
+       Slow Drop.
+    2. Otherwise, recent PPR at or above the position benchmark is Slow Riser.
+    3. Otherwise, a waiver score of 50 or more is Slow Riser.
+    This is a heuristic label, not a verified trend.
+
+    Parameters
+    ----------
+    score : float
+        Waiver score W (0-100).
+    ppr_trend, opp_trend, snap_trend : float
+        Trends in [-1, 1].
+    recent_ppr : float
+        Recent average PPR.
+    baseline : float
+        The position's PPR benchmark.
+
+    Returns
+    -------
+    str
+        ``"Slow Riser"`` or ``"Slow Drop"``.
     """
     signals = [(ppr_trend, 0.50), (opp_trend, 0.30), (snap_trend, 0.20)]
     available = [(float(x), weight) for x, weight in signals if pd.notna(x)]
@@ -244,6 +387,47 @@ def classify_waiver_scenario(
     games_analyzed,
     settings,
 ):
+    """Assign one of the four waiver flags and a short reason.
+
+    The rules run in order and the first match wins:
+    1. One-week spike (latest game above 1.8 * recent median and 1.5 * benchmark)
+       with under 67% of recent games confirming: conservative flag.
+    2. Must Pick Up: points and usage rising, 67%+ of recent games confirm,
+       score >= 72, recent PPR >= 85% of the benchmark, 5+ games.
+    3. Slow Riser: points and usage rising, 50%+ confirm, score >= 52.
+    4. Slow Riser: usage rising, PPR trend above -0.30, recent PPR below the
+       benchmark.
+    5. Must Drop: points and usage falling, 67%+ confirm the drop, score <= 43,
+       recent PPR under 60% of the benchmark.
+    6. Slow Drop: points and usage falling, 50%+ confirm the drop.
+    7. Anything mixed or steady (points and usage disagree, recent volatility of
+       0.15 or more, a steady producer, everything else):
+       ``conservative_waiver_flag``.
+    "Points rising/falling" means a PPR trend of at least +0.20 / -0.20; "usage
+    rising/falling" means an opportunity or snap trend of at least +0.10 / -0.10.
+
+    Parameters
+    ----------
+    score : float
+        Waiver score W (0-100).
+    recent_ppr, recent_median, latest_ppr : float
+        Recent average PPR, recent median PPR and the last game's PPR.
+    ppr_trend, opp_trend, snap_trend : float
+        Trends in [-1, 1].
+    upward_confirmation, downward_confirmation : float
+        Share of recent games confirming a rise / drop (0-1).
+    recent_volatility : float
+        Blended volatility from ``calculate_stability``.
+    games_analyzed : int
+        Number of valid games.
+    settings : dict
+        The position's ``MODEL2_SETTINGS`` entry.
+
+    Returns
+    -------
+    tuple of (str, str)
+        The flag and the reason shown in the rankings.
+    """
     baseline = settings["ppr"]
     usage_rising = opp_trend >= 0.10 or snap_trend >= 0.10
     usage_falling = opp_trend <= -0.10 or snap_trend <= -0.10
@@ -348,11 +532,33 @@ def classify_waiver_scenario(
 # MODEL 2 — ADAPTIVE SCORING FOR LIMITED / PARTIAL HISTORY
 # ============================================================
 def calculate_adaptive_waiver(player, settings, as_of_week):
-    """Score limited history using observed metrics only.
+    """Score a player with a short or patchy history, using only the data he has.
 
-    Missing metrics are excluded and remaining weights renormalized.
-    One game has no trend evidence, so it receives a neutral flag.
-    Short histories never qualify for high-confidence Must Pick Up/Drop.
+    Used when a player has fewer than 4 valid games, fewer than 75% of his games
+    are valid, or fewer than 2 games come before his recent window. Missing
+    metrics are left out and the remaining weights are renormalized. The score is
+    then discounted for few games and missing fields:
+    evidence = (0.75 + 0.25 * min(games / 5, 1)) * (0.80 + 0.20 * completeness).
+    Short histories never get Must Pick Up or Must Drop: usage clearly up or
+    down (+/-0.10, with 2+ games) gives Slow Riser or Slow Drop; otherwise
+    ``conservative_waiver_flag`` decides. One game has no trend, so it gets a
+    neutral flag.
+
+    Parameters
+    ----------
+    player : pandas.DataFrame
+        All of the player's games through the selected week, with
+        ``weekly_volatility``.
+    settings : dict
+        The position's ``MODEL2_SETTINGS`` entry.
+    as_of_week : int
+        The selected week. Not used in the calculation.
+
+    Returns
+    -------
+    dict
+        Component scores, trends, ``waiver_score`` (0-100), ``waiver_flag``,
+        ``scenario`` and ``games_analyzed``.
     """
     player = player.sort_values("week")
     metrics = {
@@ -515,6 +721,36 @@ def calculate_waiver_model(
     as_of_week,
     consistent_player_ids,
 ):
+    """Run Waiver Wire Alerts for one season as of a chosen week.
+
+    Uses only games through ``as_of_week``, so no later results leak in. For each
+    player, the recent window is his last 2-4 valid games (a third of his valid
+    games), compared with every valid game before it. The waiver score is
+    W = 100 * (0.40 F + 0.20 O + 0.15 S + 0.15 V + 0.10 T) * E, where
+    E = 0.80 + 0.20 * min(1, valid games / (week - 1)) discounts thin histories.
+    Players without enough history go to ``calculate_adaptive_waiver``. Every
+    player gets exactly one of the four flags.
+
+    Parameters
+    ----------
+    weekly_data : pandas.DataFrame
+        Weekly usage rows. The dashboard passes only players rostered in at most
+        50% of ESPN leagues.
+    selected_season : int
+        Season to score.
+    as_of_week : int
+        Last week included (1-18).
+    consistent_player_ids : tuple of str
+        Not used by the calculation (Waiver Wire Alerts are independent of the
+        Player Consistency Model); it only takes part in the cache key.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per player: identity columns, ``waiver_flag``, ``waiver_score``
+        (0-100), ``scenario``, the five component scores (0-1), PPR averages,
+        trends, volatility, confirmation shares and ``games_analyzed``.
+    """
     data = weekly_data.loc[
         (weekly_data["season"] == selected_season) & (weekly_data["week"] <= as_of_week)
     ].copy()
@@ -547,6 +783,7 @@ def calculate_waiver_model(
     results = []
 
     def add_result(result):
+        """Store one player's result, giving a fallback flag if it has none of the four."""
         # Every scored player receives exactly one of the four waiver flags.
         # Model 1 consistency does not override Model 2 classification.
         if result.get("waiver_flag") not in WAIVER_FLAGS:

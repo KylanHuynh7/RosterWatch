@@ -246,6 +246,23 @@ def paginated_table(
     filter_signature,
     column_config=None,
 ):
+    """Show a table 15 rows at a time with Previous / Next buttons.
+
+    The current page is kept in ``st.session_state`` under ``table_key`` and goes
+    back to page 1 whenever ``filter_signature`` changes (for example a new season
+    or position).
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Rows to show.
+    table_key : str
+        Unique name for this table's page state and buttons.
+    filter_signature : hashable
+        The filter values the table depends on.
+    column_config : dict, optional
+        Streamlit column formats.
+    """
     if data.empty:
         st.info("No players match these filters.")
         return
@@ -319,6 +336,30 @@ def weekly_chart(
     percentage=False,
     bar=False,
 ):
+    """Build an 18-week chart of one metric for the Player Explorer.
+
+    Weeks the player did not play are left as gaps, so every chart lines up on
+    Weeks 1-18.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        One player's weekly rows.
+    metric : str
+        Column to plot.
+    title : str
+        Chart title.
+    color : str
+        Line or bar color (hex).
+    percentage : bool, default False
+        Show the y-axis as 0-100%.
+    bar : bool, default False
+        Draw bars instead of a line.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
     series = data.groupby("week")[metric].mean().reindex(WEEKS)
     fig = go.Figure()
     if bar:

@@ -273,7 +273,7 @@ Players must also have at least eight valid consecutive-week comparisons.
 
 ```math
 Q=100\left(0.50\,C+0.25\,S_{\text{rank}}+0.25\,O_{\text{rank}}\right),
-\qquad C=1-\operatorname{pct}(\bar{V})
+\qquad C=1-\mathrm{pct}(\bar{V})
 ```
 
 Where:
